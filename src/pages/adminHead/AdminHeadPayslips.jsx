@@ -1,0 +1,573 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  ArrowLeft,
+  Download,
+  Filter,
+  Printer,
+  Search,
+  ShieldCheck,
+  UserRound,
+  X,
+  FileText,
+  Building2,
+  CalendarDays,
+  CheckCircle2,
+  FileSpreadsheet,
+} from "lucide-react";
+import { supabase } from "../../lib/supabaseClient";
+
+const PAYROLL_TABLE = "hrmss_payroll";
+const EMP_TABLE = "hrmss_employees";
+const PAYSLIP_RECORDS = "hrmss_payslip_records";
+
+const money = (n) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(Number(n || 0));
+
+function numberToWords(n) {
+  const ones = [
+    "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+    "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen",
+  ];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+  const toWordsBelow100 = (x) => {
+    if (x < 20) return ones[x];
+    const t = Math.floor(x / 10);
+    const o = x % 10;
+    return tens[t] + (o ? " " + ones[o] : "");
+  };
+
+  const toWordsBelow1000 = (x) => {
+    const h = Math.floor(x / 100);
+    const r = x % 100;
+    if (!h) return toWordsBelow100(r);
+    if (!r) return ones[h] + " Hundred";
+    return ones[h] + " Hundred " + toWordsBelow100(r);
+  };
+
+  const num = Math.floor(Number(n || 0));
+  if (Number.isNaN(num)) return "";
+  if (num < 1000) return toWordsBelow1000(num);
+
+  const crore = Math.floor(num / 10000000);
+  const lakh = Math.floor((num % 10000000) / 100000);
+  const thousand = Math.floor((num % 100000) / 1000);
+  const rest = num % 1000;
+
+  const parts = [];
+  if (crore) parts.push(toWordsBelow1000(crore) + " Crore");
+  if (lakh) parts.push(toWordsBelow1000(lakh) + " Lakh");
+  if (thousand) parts.push(toWordsBelow1000(thousand) + " Thousand");
+  if (rest) parts.push(toWordsBelow1000(rest));
+
+  return parts.join(" ");
+}
+
+function MiniDetail({ label, value }) {
+  return (
+    <div className="rounded-2xl border bg-slate-50 px-4 py-3">
+      <p className="text-[10px] font-bold uppercase text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-extrabold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function PayslipPreviewModal({ open, onClose, slip }) {
+  if (!open || !slip) return null;
+
+  const earnings = [
+    ["Basic Salary", slip.basic || 0],
+    ["House Rent Allowance (HRA)", slip.hra || 0],
+    ["Allowances", slip.allowances || 0],
+  ];
+  const deductions = [["Deductions", slip.deductions || 0]];
+  const earningsTotal = earnings.reduce((s, [, v]) => s + Number(v || 0), 0);
+  const deductionsTotal = deductions.reduce((s, [, v]) => s + Number(v || 0), 0);
+  const netPay = Math.max(0, Number(slip.net || earningsTotal - deductionsTotal));
+  const monthYear = slip.month || "-";
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/50 p-4 sm:p-8 overflow-y-auto flex items-start justify-center">
+      <div className="w-full max-w-4xl animate-in fade-in zoom-in-95 duration-200">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-white">
+            <FileText size={18} />
+            <p className="text-sm font-bold">Payslip Preview</p>
+            <span className="text-white/70 text-xs font-semibold">
+              ({slip.name} | {monthYear})
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white hover:bg-white/15"
+              onClick={() => window.print?.()}
+            >
+              <Printer size={16} />
+              Print
+            </button>
+            <button
+              type="button"
+              className="h-10 w-10 rounded-xl bg-white text-slate-900 grid place-items-center hover:bg-slate-100"
+              onClick={onClose}
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-3xl bg-white shadow-2xl overflow-hidden border">
+          <div className="bg-gradient-to-r from-indigo-700 to-violet-800 px-6 py-5 text-white">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-xl bg-white/15 grid place-items-center border border-white/10">
+                  <Building2 size={18} className="text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-lg font-extrabold leading-tight">{slip.company || "Company"}</p>
+                  <p className="text-[11px] font-semibold text-white/80">
+                    {slip.companyAddress || "Payslip generated by HRMS"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <p className="text-[11px] font-bold text-white/80">Payslip for</p>
+                <p className="text-sm font-extrabold">{monthYear}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-4">
+            <div className="rounded-2xl border bg-white p-4">
+              <div className="flex items-center gap-2">
+                <UserRound size={16} className="text-indigo-600" />
+                <p className="text-xs font-extrabold text-slate-900 uppercase">Employee Details</p>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500">Employee Name</p>
+                  <p className="text-sm font-extrabold text-slate-900">{slip.name}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500">Employee ID</p>
+                  <p className="text-sm font-extrabold text-slate-900">{slip.employeeId}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500">Designation</p>
+                  <p className="text-sm font-extrabold text-slate-900">{slip.role || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500">Department</p>
+                  <p className="text-sm font-extrabold text-slate-900">{slip.dept || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500">Date of Joining</p>
+                  <p className="text-sm font-extrabold text-slate-900">{slip.joinDate || "-"}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border bg-white overflow-hidden">
+                <div className="px-4 py-3 border-b bg-emerald-50">
+                  <p className="text-xs font-extrabold text-emerald-700 uppercase">Earnings</p>
+                </div>
+                <div className="p-4 space-y-3">
+                  {earnings.map(([k, v]) => (
+                    <div key={k} className="flex items-center justify-between text-sm">
+                      <p className="text-slate-600 font-semibold">{k}</p>
+                      <p className="text-slate-900 font-extrabold tabular-nums">{money(v)}</p>
+                    </div>
+                  ))}
+                  <div className="mt-2 rounded-xl bg-emerald-50 px-4 py-3 flex items-center justify-between">
+                    <p className="text-xs font-extrabold text-emerald-700">Total Earnings (Gross)</p>
+                    <p className="text-sm font-extrabold text-emerald-800 tabular-nums">{money(earningsTotal)}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border bg-white overflow-hidden">
+                <div className="px-4 py-3 border-b bg-rose-50">
+                  <p className="text-xs font-extrabold text-rose-700 uppercase">Deductions</p>
+                </div>
+                <div className="p-4 space-y-3">
+                  {deductions.map(([k, v]) => (
+                    <div key={k} className="flex items-center justify-between text-sm">
+                      <p className="text-slate-600 font-semibold">{k}</p>
+                      <p className="text-rose-600 font-extrabold tabular-nums">-{money(v)}</p>
+                    </div>
+                  ))}
+                  <div className="mt-2 rounded-xl bg-rose-50 px-4 py-3 flex items-center justify-between">
+                    <p className="text-xs font-extrabold text-rose-700">Total Deductions</p>
+                    <p className="text-sm font-extrabold text-rose-800 tabular-nums">-{money(deductionsTotal)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-white p-4">
+              <div className="flex items-center gap-2">
+                <CalendarDays size={16} className="text-indigo-600" />
+                <p className="text-xs font-extrabold text-slate-900 uppercase">Attendance Summary</p>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <MiniDetail label="Total Working Days" value={slip.workingDays || "-"} />
+                <MiniDetail label="Days Present" value={slip.presentDays || "-"} />
+                <MiniDetail label="Paid Leave" value={slip.paidLeave || "-"} />
+                <MiniDetail label="Loss of Pay (LOP) Days" value={slip.lopDays || "-"} />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-white p-4">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-indigo-600" />
+                <p className="text-xs font-extrabold text-slate-900 uppercase">Net Pay Summary</p>
+              </div>
+
+              <div className="mt-3 space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <p className="text-slate-600 font-semibold">Total Earnings</p>
+                  <p className="text-slate-900 font-extrabold tabular-nums">{money(earningsTotal)}</p>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <p className="text-slate-600 font-semibold">Total Deductions</p>
+                  <p className="text-rose-600 font-extrabold tabular-nums">-{money(deductionsTotal)}</p>
+                </div>
+
+                <div className="mt-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-center">
+                  <p className="text-[10px] font-bold text-emerald-700 uppercase">Net Pay (Take-Home)</p>
+                  <p className="mt-1 text-2xl font-extrabold text-emerald-800 tabular-nums">{money(netPay)}</p>
+                  <p className="mt-1 text-[10px] font-semibold text-emerald-700/80 italic">
+                    Rupees {numberToWords(netPay)} Only
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* <div className="mt-4 flex items-center justify-center gap-2 text-[10px] font-semibold text-slate-500">
+              <ShieldCheck size={14} />
+              This is a system-generated payslip and does not require a signature.
+            </div> */}
+          </div>
+        </div>
+
+        <div className="h-6" />
+      </div>
+    </div>
+  );
+}
+
+export default function AdminHeadPayslips() {
+  const [query, setQuery] = useState("");
+  const [monthFilter, setMonthFilter] = useState("all");
+  const [rows, setRows] = useState([]);
+  const [months, setMonths] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errMsg, setErrMsg] = useState("");
+  const [selectedId, setSelectedId] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const selected = rows.find((r) => r.id === selectedId) || null;
+
+  const loadPayslips = async () => {
+    try {
+      setLoading(true);
+      setErrMsg("");
+
+      const [empRes, payrollRes, recordRes] = await Promise.all([
+        supabase.from(EMP_TABLE).select("employee_id, full_name, department, role, join_date"),
+        supabase
+          .from(PAYROLL_TABLE)
+          .select("id, employee_id, month, basic_salary, hra, allowances, deductions, net_salary, created_at")
+          .order("created_at", { ascending: false }),
+        supabase.from(PAYSLIP_RECORDS).select("month, published, note, created_at"),
+      ]);
+
+      if (empRes.error) throw new Error(empRes.error.message);
+      if (payrollRes.error) throw new Error(payrollRes.error.message);
+      if (recordRes.error) throw new Error(recordRes.error.message);
+
+      const empMap = new Map(
+        (empRes.data || []).map((e) => [
+          e.employee_id,
+          {
+            name: e.full_name || e.employee_id,
+            dept: e.department || "-",
+            role: e.role || "-",
+            joinDate: e.join_date || "-",
+          },
+        ])
+      );
+
+      const publishedByMonth = new Map(
+        (recordRes.data || []).map((r) => [String(r.month || ""), Boolean(r.published)])
+      );
+
+      const normalizedRows = (payrollRes.data || []).map((p) => {
+        const emp = empMap.get(p.employee_id) || {};
+        const month = String(p.month || "").trim() || "-";
+        const basic = Number(p.basic_salary || 0);
+        const hra = Number(p.hra || 0);
+        const allowances = Number(p.allowances || 0);
+        const deductions = Number(p.deductions || 0);
+        const gross = basic + hra + allowances;
+        const net = Number(p.net_salary ?? Math.max(gross - deductions, 0));
+
+        return {
+          id: p.id,
+          employeeId: p.employee_id,
+          name: emp.name,
+          dept: emp.dept,
+          role: emp.role,
+          joinDate: emp.joinDate,
+          month,
+          basic,
+          hra,
+          allowances,
+          deductions,
+          gross,
+          net,
+          sent: publishedByMonth.get(month) || false,
+          createdAt: p.created_at || null,
+        };
+      });
+
+      const monthList = Array.from(new Set(normalizedRows.map((r) => r.month).filter(Boolean)));
+
+      setRows(normalizedRows);
+      setMonths(monthList);
+
+      if (!selectedId && normalizedRows.length) setSelectedId(normalizedRows[0].id);
+      if (monthFilter === "all" && monthList.length) setMonthFilter(monthList[0]);
+    } catch (e) {
+      setErrMsg(e?.message || "Failed to load payslips");
+      setRows([]);
+      setMonths([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPayslips();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!selected && rows.length) setSelectedId(rows[0].id);
+  }, [selected, rows]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return rows.filter((row) => {
+      if (monthFilter !== "all" && row.month !== monthFilter) return false;
+      if (!q) return true;
+      return (
+        row.name.toLowerCase().includes(q) ||
+        row.employeeId.toLowerCase().includes(q) ||
+        row.dept.toLowerCase().includes(q) ||
+        row.month.toLowerCase().includes(q)
+      );
+    });
+  }, [rows, query, monthFilter]);
+
+  const stats = useMemo(() => {
+    const total = filtered.length;
+    const sent = filtered.filter((r) => r.sent).length;
+    const pending = total - sent;
+    const totalNet = filtered.reduce((s, r) => s + Number(r.net || 0), 0);
+    return { total, sent, pending, months: months.length, totalNet };
+  }, [filtered, months]);
+
+  return (
+    <div className="space-y-6">
+      {selected ? (
+        <PayslipPreviewModal open={previewOpen} onClose={() => setPreviewOpen(false)} slip={selected} />
+      ) : null}
+
+      <div>
+        <div className="flex items-center gap-3 mb-1">
+          <div className="h-10 w-10 rounded-xl bg-indigo-700 text-white flex items-center justify-center shadow-md shadow-indigo-200">
+             <FileSpreadsheet size={20} />
+          </div>
+          <h1 className="text-2xl font-extrabold text-slate-900">Payslip Records</h1>
+        </div>
+        <p className="text-sm text-slate-500">View and verify all generated employee payslips.</p>
+      </div>
+
+      {errMsg ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {errMsg}
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 uppercase">Total Records</p>
+          <p className="mt-1 text-2xl font-extrabold text-slate-900">{stats.total}</p>
+        </div>
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 uppercase">Total Net Pay</p>
+          <p className="mt-1 text-2xl font-extrabold text-indigo-700">{money(stats.totalNet)}</p>
+        </div>
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 uppercase">Published</p>
+          <p className="mt-1 text-2xl font-extrabold text-emerald-700">{stats.sent}</p>
+        </div>
+        <div className="rounded-2xl border bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 uppercase">Pending Publication</p>
+          <p className="mt-1 text-2xl font-extrabold text-amber-700">{stats.pending}</p>
+        </div>
+      </div>
+
+      <div className="rounded-3xl border bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search name, ID..."
+                className="w-64 rounded-2xl border bg-white pl-9 pr-3 py-2 text-sm font-semibold text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-indigo-200"
+              />
+            </div>
+
+            <select
+              value={monthFilter}
+              onChange={(e) => setMonthFilter(e.target.value)}
+              className="h-10 rounded-2xl border bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm"
+            >
+              <option value="all">All Months</option>
+              {months.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button 
+             onClick={loadPayslips}
+             className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold hover:bg-slate-200 transition"
+          >
+             Refresh
+          </button>
+        </div>
+
+        <div className="mt-4 overflow-hidden rounded-2xl border">
+          <div className="hidden grid-cols-12 gap-3 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-600 md:grid">
+            <span className="col-span-4">Employee</span>
+            <span className="col-span-2">Department</span>
+            <span className="col-span-2">Month</span>
+            <span className="col-span-2 text-right">Net Pay</span>
+            <span className="col-span-2 text-right">Actions</span>
+          </div>
+
+          {loading ? (
+            <div className="p-6 text-sm text-slate-600 flex items-center gap-2">
+                <div className="h-4 w-4 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin"></div>
+                Loading records...
+            </div>
+          ) : (
+            <div className="divide-y">
+              {filtered.map((row) => (
+                <div
+                  key={row.id}
+                  className={`grid grid-cols-1 gap-3 px-4 py-3 transition md:grid-cols-12 md:items-center ${
+                    row.id === selectedId ? "bg-indigo-50" : "bg-white hover:bg-slate-50"
+                  }`}
+                  onClick={() => setSelectedId(row.id)}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="md:col-span-4">
+                    <p className="font-semibold text-slate-900">{row.name}</p>
+                    <p className="text-xs text-slate-500">
+                      {row.employeeId} | {row.id}
+                    </p>
+                  </div>
+                  <div className="md:col-span-2 text-sm font-semibold text-slate-700">{row.dept}</div>
+                  <div className="md:col-span-2 text-sm font-semibold text-slate-700">{row.month}</div>
+                  <div className="md:col-span-2 text-right text-sm font-extrabold text-slate-900">
+                    {money(row.net)}
+                  </div>
+
+                  <div className="md:col-span-2 flex flex-wrap items-center justify-end gap-2 text-sm">
+                    <button
+                      type="button"
+                      className="rounded-xl bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:opacity-95"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedId(row.id);
+                        setPreviewOpen(true);
+                      }}
+                    >
+                      View Slip
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {!filtered.length ? (
+                <div className="p-6 text-center text-sm text-slate-500">No payslips found.</div>
+              ) : null}
+            </div>
+          )}
+        </div>
+
+        {selected ? (
+          <div className="mt-5 rounded-3xl border bg-white p-5 shadow-sm lg:col-span-2 animate-in fade-in slide-in-from-bottom-2">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase">Selected</p>
+                  <p className="text-lg font-extrabold text-slate-900">
+                    {selected.name}
+                  </p>
+                  <p className="text-xs text-slate-500">{selected.month}</p>
+                </div>
+
+                <span
+                  className={[
+                    "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold",
+                    selected.sent
+                      ? "bg-emerald-50 text-emerald-800 border-emerald-100"
+                      : "bg-amber-50 text-amber-800 border-amber-100",
+                  ].join(" ")}
+                >
+                  <span className="h-2 w-2 rounded-full bg-current" />
+                  {selected.sent ? "Published" : "Not Published"}
+                </span>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <MiniDetail label="Employee ID" value={selected.employeeId} />
+                <MiniDetail label="Gross Salary" value={money(selected.gross)} />
+                <MiniDetail label="Net Pay" value={money(selected.net)} />
+                <MiniDetail label="Deductions" value={money(selected.deductions)} />
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPreviewOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 shadow-lg shadow-indigo-100"
+                >
+                  <FileText size={16} />
+                  Open Full Payslip
+                </button>
+              </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
