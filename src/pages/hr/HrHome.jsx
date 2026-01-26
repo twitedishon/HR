@@ -17,17 +17,14 @@ import {
   Sparkles,
   Hash,
   IdCard,
-  Bell,
-  ClipboardList,
-  Clock3,
-  CheckCircle2,
   AlertTriangle,
-  Info,
-  CalendarCheck,
+  Briefcase,
+  CreditCard,
+  GraduationCap,
 } from "lucide-react";
 
 import { supabase, isSupabaseConfigured } from "../../lib/supabaseClient";
-import { formatDDMMYYYY, formatDDMMYYYYHHMM } from "../../lib/dateUtils";
+import { formatDDMMYYYY } from "../../lib/dateUtils";
 
 /* ---------------- HELPERS ---------------- */
 function initials(name = "") {
@@ -39,9 +36,6 @@ function initials(name = "") {
 function safeLower(x) {
   return (x || "").toString().toLowerCase();
 }
-function clamp(n, min, max) {
-  return Math.max(min, Math.min(max, n));
-}
 function formatDate(iso) {
   return formatDDMMYYYY(iso);
 }
@@ -49,22 +43,7 @@ function formatDate(iso) {
 const EMP_TABLE = "hrmss_employees";
 const EMP_PROFILE_TABLE = "hrmss_employee_profiles";
 const ADMIN_PROFILE_TABLE = "hrmss_profiles";
-const LEAVE_TABLE = "hrmss_leave_requests";
-const ATT_TABLE = "employee_attendance";
-const NOTIF_TABLE = "employee_notifications";
 
-function calcLeaveDays(from, to) {
-  if (!from || !to) return 1;
-  const f = new Date(from);
-  const t = new Date(to);
-  if (Number.isNaN(f.getTime()) || Number.isNaN(t.getTime())) return 1;
-  const diff = Math.round((t - f) / 86400000) + 1;
-  return diff > 0 ? diff : 1;
-}
-
-function formatDateTime(iso) {
-  return formatDDMMYYYYHHMM(iso);
-}
 function deptBadge(dept = "Unknown") {
   const key = safeLower(dept);
   const options = [
@@ -201,12 +180,41 @@ const ModalTabBtn = ({ active, onClick, icon: Icon, label }) => (
   </button>
 );
 
-const tonePill = (t) => {
-  if (t === "Approved") return "bg-emerald-50 text-emerald-700 border-emerald-200";
-  if (t === "Rejected") return "bg-rose-50 text-rose-700 border-rose-200";
-  if (t === "Pending") return "bg-amber-50 text-amber-800 border-amber-200";
-  return "bg-slate-50 text-slate-700 border-slate-200";
+const parseList = (val) => {
+  if (Array.isArray(val)) return val;
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
 };
+
+const FieldRow = ({ label, value }) => (
+  <div className="rounded-2xl border bg-slate-50 p-3">
+    <div className="text-[11px] uppercase tracking-wide text-slate-500">{label}</div>
+    <div className="mt-1 text-sm font-semibold text-slate-900 break-words">{value || "-"}</div>
+  </div>
+);
+
+const ProfileListSection = ({ title, icon: Icon, loading, items, emptyText, render }) => (
+  <div className="space-y-3">
+    <div className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
+      {Icon ? <Icon size={16} /> : null}
+      {title}
+    </div>
+    {loading ? (
+      <div className="rounded-2xl border bg-white p-4 text-sm text-slate-500">Loading...</div>
+    ) : items?.length ? (
+      <div className="space-y-2">{items.map(render)}</div>
+    ) : (
+      <div className="rounded-2xl border bg-white p-4 text-sm text-slate-500">{emptyText}</div>
+    )}
+  </div>
+);
 
 /* ---------------- PAGE ---------------- */
 export default function HrHome() {
@@ -225,9 +233,7 @@ export default function HrHome() {
 
   const [viewing, setViewing] = useState(null);
   const [modalTab, setModalTab] = useState("personal");
-  const [leaveData, setLeaveData] = useState([]);
-  const [attendanceData, setAttendanceData] = useState(null);
-  const [notifData, setNotifData] = useState([]);
+  const [profileDetail, setProfileDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
 
@@ -429,9 +435,7 @@ export default function HrHome() {
     const loadDetails = async () => {
       if (!viewing || !isSupabaseConfigured) {
         if (mounted) {
-          setLeaveData([]);
-          setAttendanceData(null);
-          setNotifData([]);
+          setProfileDetail(null);
           setDetailError("");
           setDetailLoading(false);
         }
@@ -442,97 +446,23 @@ export default function HrHome() {
         setDetailLoading(true);
         setDetailError("");
 
-        const ownerRole = viewing.type === "employee" ? "employee" : "admin";
+        const profileTable =
+          viewing.type === "employee" ? EMP_PROFILE_TABLE : ADMIN_PROFILE_TABLE;
+        const idColumn = viewing.type === "employee" ? "employee_id" : "user_id";
 
-        const [leaveRes, attRes, notifRes] = await Promise.all([
-          supabase
-            .from(LEAVE_TABLE)
-            .select(
-              "id, leave_type, from_date, to_date, status, reason, applied_at"
-            )
-            .eq("owner_role", ownerRole)
-            .eq("owner_id", viewing.id)
-            .order("applied_at", { ascending: false }),
-          viewing.type === "employee"
-            ? supabase
-                .from(ATT_TABLE)
-                .select(
-                  "attendance_date, status, check_in, check_out, total_hours"
-                )
-                .eq("employee_id", viewing.id)
-                .order("attendance_date", { ascending: false })
-                .limit(10)
-            : Promise.resolve({ data: [], error: null }),
-          viewing.userId
-            ? supabase
-                .from(NOTIF_TABLE)
-                .select("id,title,message,type,unread,created_at")
-                .eq("user_id", viewing.userId)
-                .order("created_at", { ascending: false })
-                .limit(20)
-            : Promise.resolve({ data: [], error: null }),
-        ]);
+        const { data: profileRow, error: profileErr } = await supabase
+          .from(profileTable)
+          .select("*")
+          .eq(idColumn, viewing.id)
+          .maybeSingle();
 
         if (!mounted) return;
 
-        if (leaveRes.error) throw leaveRes.error;
-
-        const mappedLeaves = (leaveRes.data || []).map((row) => {
-          const from = row.from_date ? String(row.from_date) : "";
-          const to = row.to_date ? String(row.to_date) : from;
-          return {
-            id: row.id,
-            type: row.leave_type || "-",
-            from,
-            to,
-            days: calcLeaveDays(from, to),
-            status: row.status || "Pending",
-            reason: row.reason || "-",
-            appliedAt: row.applied_at ? String(row.applied_at).slice(0, 10) : "-",
-          };
-        });
-
-        const attRows = attRes.error ? [] : attRes.data || [];
-        const presentDays = attRows.filter((r) => r.status === "Present").length;
-        const absentDays = attRows.filter((r) => r.status === "Absent").length;
-        const lateMarks = attRows.filter((r) => r.status === "Late").length;
-        const workingDays = attRows.length;
-        const logs = attRows.map((row) => ({
-          date: row.attendance_date || "-",
-          in: row.check_in || "-",
-          out: row.check_out || "-",
-          hours: row.total_hours || "-",
-          status: row.status || "-",
-        }));
-
-        const mappedNotifs = (notifRes.error ? [] : notifRes.data || []).map((row) => ({
-          id: row.id,
-          at: formatDateTime(row.created_at),
-          title: row.title || "-",
-          message: row.message || "",
-          type: row.type || "info",
-          read: !row.unread,
-        }));
-
-        setLeaveData(mappedLeaves);
-        setAttendanceData(
-          viewing.type === "employee" && !attRes.error
-            ? {
-                month: "Recent",
-                workingDays,
-                presentDays,
-                absentDays,
-                lateMarks,
-                logs,
-              }
-            : null
-        );
-        setNotifData(mappedNotifs);
+        if (profileErr) throw profileErr;
+        setProfileDetail(profileRow || null);
       } catch (fetchError) {
         if (!mounted) return;
-        setLeaveData([]);
-        setAttendanceData(null);
-        setNotifData([]);
+        setProfileDetail(null);
         setDetailError(fetchError?.message || "Failed to load details.");
       } finally {
         if (mounted) setDetailLoading(false);
@@ -789,9 +719,11 @@ export default function HrHome() {
             {/* tabs */}
             <div className="flex flex-wrap items-center gap-2">
               <ModalTabBtn active={modalTab === "personal"} onClick={() => setModalTab("personal")} icon={IdCard} label="Personal" />
-              <ModalTabBtn active={modalTab === "leave"} onClick={() => setModalTab("leave")} icon={ClipboardList} label="Leave" />
-              <ModalTabBtn active={modalTab === "attendance"} onClick={() => setModalTab("attendance")} icon={CalendarCheck} label="Attendance" />
-              <ModalTabBtn active={modalTab === "notifications"} onClick={() => setModalTab("notifications")} icon={Bell} label="Notifications" />
+              <ModalTabBtn active={modalTab === "experience"} onClick={() => setModalTab("experience")} icon={Briefcase} label="Experience" />
+              <ModalTabBtn active={modalTab === "emergency"} onClick={() => setModalTab("emergency")} icon={AlertTriangle} label="Emergency" />
+              <ModalTabBtn active={modalTab === "bank"} onClick={() => setModalTab("bank")} icon={CreditCard} label="Bank" />
+              <ModalTabBtn active={modalTab === "education"} onClick={() => setModalTab("education")} icon={GraduationCap} label="Education" />
+              <ModalTabBtn active={modalTab === "skills"} onClick={() => setModalTab("skills")} icon={Sparkles} label="Skills" />
             </div>
 
             {detailError ? (
@@ -890,233 +822,105 @@ export default function HrHome() {
               </div>
             ) : null}
 
-            {/* LEAVE */}
-            {modalTab === "leave" ? (
-              <div className="rounded-2xl border bg-white overflow-hidden">
-                <div className="px-4 py-3 border-b bg-slate-50 flex items-center justify-between">
-                  <div className="text-sm font-extrabold text-slate-900">Leave Requests</div>
-                  <div className="text-xs text-slate-500">{leaveData.length} items</div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-white text-slate-600">
-                      <tr className="border-b">
-                        <th className="text-left px-4 py-3 font-semibold">Request</th>
-                        <th className="text-left px-4 py-3 font-semibold">Duration</th>
-                        <th className="text-left px-4 py-3 font-semibold">Status</th>
-                        <th className="text-right px-4 py-3 font-semibold">Applied</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {detailLoading ? (
-                        <tr>
-                          <td colSpan={4} className="px-4 py-10 text-center text-slate-500">
-                            Loading leave requests...
-                          </td>
-                        </tr>
-                      ) : (
-                        leaveData.map((lr) => (
-                          <tr key={lr.id} className="hover:bg-slate-50/60 transition">
-                            <td className="px-4 py-3">
-                              <div className="font-semibold text-slate-900">{lr.type}</div>
-                              <div className="text-xs text-slate-500 truncate">{lr.reason}</div>
-                              <div className="mt-1 text-[11px] text-slate-500">{lr.id}</div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="text-slate-900 font-semibold">
-                                {lr.from} - {lr.to}
-                              </div>
-                              <div className="text-xs text-slate-500">{lr.days} day(s)</div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${tonePill(lr.status)}`}>
-                                <Clock3 size={14} className="opacity-80" />
-                                {lr.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right text-slate-700 font-semibold">{lr.appliedAt}</td>
-                          </tr>
-                        ))
-                      )}
-                      {!detailLoading && leaveData.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="px-4 py-10 text-center text-slate-500">
-                            No leave requests.
-                          </td>
-                        </tr>
-                      ) : null}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+            {/* EXPERIENCE */}
+            {modalTab === "experience" ? (
+              <ProfileListSection
+                title="Experience"
+                icon={Briefcase}
+                loading={detailLoading}
+                items={parseList(profileDetail?.experience)}
+                emptyText="No experience records."
+                render={(row, idx) => (
+                  <div key={idx} className="rounded-2xl border bg-white p-4">
+                    <div className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                      <Briefcase size={16} /> {row.organization || "-"}
+                    </div>
+                    <div className="mt-2 text-xs text-slate-600">Designation: {row.designation || "-"}</div>
+                    <div className="text-xs text-slate-600">Duration: {row.duration || "-"}</div>
+                    <div className="text-xs text-slate-600">Reason: {row.reasonForLeaving || "-"}</div>
+                  </div>
+                )}
+              />
             ) : null}
 
-            {/* ATTENDANCE */}
-            {modalTab === "attendance" ? (
-              <div className="space-y-3">
+            {/* EMERGENCY */}
+            {modalTab === "emergency" ? (
+              <div className="rounded-2xl border bg-white p-4">
+                <div className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                  <AlertTriangle size={16} /> Emergency Contact
+                </div>
                 {detailLoading ? (
-                  <div className="rounded-2xl border bg-white p-4 text-sm text-slate-500">
-                    Loading attendance...
-                  </div>
-                ) : !attendanceData ? (
-                  <div className="rounded-2xl border bg-white p-4 text-sm text-slate-500">
-                    No attendance data.
+                  <div className="text-sm text-slate-500 mt-2">Loading...</div>
+                ) : profileDetail?.emergency_name || profileDetail?.emergency_contact_number ? (
+                  <div className="mt-3 space-y-1 text-sm text-slate-700">
+                    <div className="font-semibold">{profileDetail.emergency_name || "-"}</div>
+                    <div className="text-xs text-slate-600">Relation: {profileDetail.emergency_relationship || "-"}</div>
+                    <div className="text-xs text-slate-600">Phone: {profileDetail.emergency_contact_number || "-"}</div>
                   </div>
                 ) : (
-                  <>
-                    <div className="rounded-2xl border bg-white p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-extrabold text-slate-900">Attendance</div>
-                          <div className="text-xs text-slate-500">{attendanceData?.month}</div>
-                        </div>
-                        <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
-                          <CalendarDays size={14} />
-                          Working Days: {attendanceData?.workingDays ?? 0}
-                        </span>
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="rounded-2xl border bg-slate-50 p-3">
-                          <div className="text-xs text-slate-500">Present</div>
-                          <div className="mt-1 text-xl font-extrabold text-slate-900">{attendanceData?.presentDays ?? 0}</div>
-                        </div>
-                        <div className="rounded-2xl border bg-slate-50 p-3">
-                          <div className="text-xs text-slate-500">Absent</div>
-                          <div className="mt-1 text-xl font-extrabold text-slate-900">{attendanceData?.absentDays ?? 0}</div>
-                        </div>
-                        <div className="rounded-2xl border bg-slate-50 p-3">
-                          <div className="text-xs text-slate-500">Late Marks</div>
-                          <div className="mt-1 text-xl font-extrabold text-slate-900">{attendanceData?.lateMarks ?? 0}</div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4">
-                        <div className="text-xs font-semibold text-slate-600 mb-2">Present Rate</div>
-                        <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-indigo-500 to-amber-500"
-                            style={{
-                              width: `${clamp(
-                                Math.round((attendanceData.presentDays / attendanceData.workingDays) * 100),
-                                0,
-                                100
-                              )}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border bg-white overflow-hidden">
-                      <div className="px-4 py-3 border-b bg-slate-50 flex items-center justify-between">
-                        <div className="text-sm font-extrabold text-slate-900">Recent Logs</div>
-                        <div className="text-xs text-slate-500">{attendanceData?.logs?.length ?? 0} rows</div>
-                      </div>
-
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full text-sm">
-                          <thead>
-                            <tr className="border-b text-slate-600">
-                              <th className="text-left px-4 py-3 font-semibold">Date</th>
-                              <th className="text-left px-4 py-3 font-semibold">In</th>
-                              <th className="text-left px-4 py-3 font-semibold">Out</th>
-                              <th className="text-left px-4 py-3 font-semibold">Hours</th>
-                              <th className="text-right px-4 py-3 font-semibold">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y">
-                            {attendanceData?.logs?.map((l, idx) => (
-                              <tr key={idx} className="hover:bg-slate-50/60 transition">
-                                <td className="px-4 py-3 font-semibold text-slate-900">{l.date}</td>
-                                <td className="px-4 py-3 text-slate-700">{l.in}</td>
-                                <td className="px-4 py-3 text-slate-700">{l.out}</td>
-                                <td className="px-4 py-3 text-slate-700">{l.hours}</td>
-                                <td className="px-4 py-3 text-right">
-                                  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border bg-slate-50 text-slate-700 border-slate-200">
-                                    <Clock3 size={14} className="opacity-80" />
-                                    {l.status}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                            {!attendanceData?.logs?.length ? (
-                              <tr>
-                                <td colSpan={5} className="px-4 py-10 text-center text-slate-500">
-                                  No logs.
-                                </td>
-                              </tr>
-                            ) : null}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </>
+                  <div className="text-sm text-slate-500 mt-2">No emergency contact added.</div>
                 )}
               </div>
             ) : null}
 
-            {/* NOTIFICATIONS */}
-            {modalTab === "notifications" ? (
-              <div className="rounded-2xl border bg-white overflow-hidden">
-                <div className="px-4 py-3 border-b bg-slate-50 flex items-center justify-between">
-                  <div className="text-sm font-extrabold text-slate-900">Notifications</div>
-                  <div className="text-xs text-slate-500">{notifData.length} items</div>
+            {/* BANK */}
+            {modalTab === "bank" ? (
+              <div className="rounded-2xl border bg-white p-4 space-y-2">
+                <div className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                  <CreditCard size={16} /> Bank & Payroll Details
                 </div>
+                {detailLoading ? (
+                  <div className="text-sm text-slate-500">Loading...</div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <FieldRow label="Account Holder" value={profileDetail?.account_holder_name} />
+                    <FieldRow label="Bank Name" value={profileDetail?.bank_name} />
+                    <FieldRow label="Account Number" value={profileDetail?.account_number} />
+                    <FieldRow label="IFSC" value={profileDetail?.ifsc_code} />
+                    <FieldRow label="Branch" value={profileDetail?.branch} />
+                  </div>
+                )}
+              </div>
+            ) : null}
 
-                <div className="p-4 space-y-3">
-                  {detailLoading ? (
-                    <div className="text-sm text-slate-500 text-center py-6">Loading notifications...</div>
-                  ) : (
-                    notifData.map((n) => {
-                      const Icon =
-                        n.type === "success"
-                          ? CheckCircle2
-                          : n.type === "warning"
-                          ? AlertTriangle
-                          : Info;
-                    const toneCls =
-                      n.type === "success"
-                        ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                        : n.type === "warning"
-                        ? "bg-amber-50 border-amber-200 text-amber-800"
-                        : "bg-sky-50 border-sky-200 text-sky-800";
+            {/* EDUCATION */}
+            {modalTab === "education" ? (
+              <ProfileListSection
+                title="Educational Qualifications"
+                icon={GraduationCap}
+                loading={detailLoading}
+                items={parseList(profileDetail?.education)}
+                emptyText="No education details."
+                render={(row, idx) => (
+                  <div key={idx} className="rounded-2xl border bg-white p-4">
+                    <div className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                      <GraduationCap size={16} /> {row.qualification || "-"}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-600">Institution: {row.institution || "-"}</div>
+                    <div className="text-xs text-slate-600">Year: {row.yearOfPassing || "-"}</div>
+                    <div className="text-xs text-slate-600">Specialization: {row.specialization || "-"}</div>
+                  </div>
+                )}
+              />
+            ) : null}
 
-                    return (
-                      <div key={n.id} className={`rounded-2xl border p-3 flex gap-3 ${toneCls}`}>
-                        <div className="shrink-0 w-10 h-10 rounded-2xl border bg-white/70 flex items-center justify-center">
-                          <Icon size={18} />
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="font-extrabold truncate">{n.title}</div>
-                              <div className="text-sm opacity-90 mt-0.5">{n.message}</div>
-                            </div>
-                            <div className="text-right shrink-0">
-                              <div className="text-[11px] opacity-80">{n.at}</div>
-                              <div
-                                className={`mt-1 inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
-                                  n.read ? "bg-white/70 border-white/60" : "bg-slate-900 text-white border-slate-900"
-                                }`}
-                              >
-                                <span className={`w-2 h-2 rounded-full ${n.read ? "bg-slate-300" : "bg-emerald-400"}`} />
-                                {n.read ? "Read" : "New"}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                  )}
-
-                  {!detailLoading && notifData.length === 0 ? (
-                    <div className="text-sm text-slate-500 text-center py-6">No notifications.</div>
-                  ) : null}
+            {/* SKILLS */}
+            {modalTab === "skills" ? (
+              <div className="rounded-2xl border bg-white p-4 space-y-3">
+                <div className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                  <Sparkles size={16} /> Skills & Expertise
                 </div>
+                {detailLoading ? (
+                  <div className="text-sm text-slate-500">Loading...</div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <FieldRow label="Primary Skills" value={profileDetail?.primary_skills} />
+                    <FieldRow label="Secondary Skills" value={profileDetail?.secondary_skills} />
+                    <div className="sm:col-span-2">
+                      <FieldRow label="Tools / Technologies" value={profileDetail?.tools_technologies} />
+                    </div>
+                  </div>
+                )}
               </div>
             ) : null}
           </div>
