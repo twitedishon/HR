@@ -619,20 +619,29 @@ export default function Login() {
           p_secret: empPassword,
         });
 
-        localStorage.setItem(
-          "HRMSS_AUTH_SESSION",
-          JSON.stringify({ ...session, loginRole: "employee", role: "employee" })
-        );
+        const normalizedEmpEmail = String(empEmail || "").trim().toLowerCase();
+        const isHariPriyaEmployee = normalizedEmpEmail === "haripriya@twite.ai";
+        const targetRole = isHariPriyaEmployee ? "admin" : "employee";
+
+        // If HariPriya signs in via the Employee tab, treat her as Admin so she lands
+        // on the admin dashboard without extra setup screens.
+        const sessionPayload = {
+          ...session,
+          loginRole: targetRole,
+          role: targetRole,
+        };
+
+        localStorage.setItem("HRMSS_AUTH_SESSION", JSON.stringify(sessionPayload));
 
         // ✅ Ensure Supabase session for Documents/Storage (will not block app login)
         await tryEnsureSupabaseForDocs(
           {
-            role: "employee",
+            role: targetRole,
             identifier: empEmail,
             password: empPassword,
             preferredEmail: empEmail,
           },
-          "employee"
+          targetRole
         );
 
         const userId =
@@ -645,6 +654,13 @@ export default function Login() {
           COMPLETION_KEY("employee"),
           completed ? "true" : "false"
         );
+
+        if (isHariPriyaEmployee) {
+          // Mark admin setup as done and send directly to the admin dashboard
+          localStorage.setItem(COMPLETION_KEY("admin"), "true");
+          navigate(roleRedirects.admin, { replace: true });
+          return;
+        }
 
         if (!completed) {
           navigate("/sign-in", {
