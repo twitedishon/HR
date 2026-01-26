@@ -192,6 +192,7 @@ const TimePreset = ({ mode, onMorning, onAfternoon }) => (
 
 /* ===================== PAGE ===================== */
 export default function LeaveManagement() {
+  const [viewMode, setViewMode] = useState("employee"); // "employee" | "admin"
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -249,19 +250,31 @@ export default function LeaveManagement() {
   const fetchRequests = async () => {
     setLoading(true);
 
-    // ✅ 1) existing HRMSS unified requests
-    const p1 = supabase
+    const isHrView = viewMode === "admin";
+    const ownerRoleFilter = isHrView ? "hr" : "employee";
+
+    // Primary table: hrmss_leave_requests
+    let q1 = supabase
       .from(LEAVES_TABLE)
       .select("*")
+      .eq("owner_role", ownerRoleFilter)
       .order("applied_at", { ascending: false });
 
-    // ✅ 2) admin leaves (your separate table)
-    const p2 = supabase
-      .from(ADMIN_LEAVES_TABLE)
-      .select("*")
-      .order("applied_at", { ascending: false });
+    // In HR view, limit to logged-in HR id if available
+    if (isHrView && currentHR?.id) {
+      q1 = q1.eq("owner_id", currentHR.id);
+    }
 
-    const [r1, r2] = await Promise.all([p1, p2]);
+    const [r1, r2] = await Promise.all([
+      q1,
+      // Admin leaves table only relevant when viewing employees (admin-origin leave directed to HR)
+      !isHrView
+        ? supabase
+            .from(ADMIN_LEAVES_TABLE)
+            .select("*")
+            .order("applied_at", { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+    ]);
 
     if (r1.error) console.warn(r1.error.message);
     if (r2.error) console.warn(r2.error.message);
@@ -359,7 +372,7 @@ export default function LeaveManagement() {
       await fetchRequests();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [viewMode]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -514,21 +527,48 @@ export default function LeaveManagement() {
   return (
     <section className="space-y-4">
       {/* Header */}
-      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="text-2xl font-extrabold text-gray-900">Leave Management</h1>
-          
-        </div>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <h1 className="text-2xl font-extrabold text-gray-900">Leave Management</h1>
 
-        <button
-          type="button"
-          onClick={() => setShowApply(true)}
-          className="self-start md:self-auto px-4 py-2 rounded-xl text-sm font-semibold bg-purple-700 text-white hover:bg-purple-800 transition"
-        >
-          Apply Leave
-        </button>
+        <div className="flex items-center gap-3 self-start md:self-auto">
+          <div className="inline-flex rounded-xl border bg-white shadow-sm p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode("employee")}
+              className={`px-3 py-1.5 text-sm font-semibold rounded-lg ${
+                viewMode === "employee"
+                  ? "bg-purple-700 text-white shadow"
+                  : "text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Employee
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("admin")}
+              className={`px-3 py-1.5 text-sm font-semibold rounded-lg ${
+                viewMode === "admin"
+                  ? "bg-purple-700 text-white shadow"
+                  : "text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              HR
+            </button>
+          </div>
+
+          {viewMode === "admin" ? (
+            <button
+              type="button"
+              onClick={() => setShowApply(true)}
+              className="px-4 py-2 rounded-xl text-sm font-semibold bg-purple-700 text-white hover:bg-purple-800 transition"
+            >
+              Apply Leave
+            </button>
+          ) : null}
+        </div>
       </div>
 
+      {/* Summary (clickable cards) */}
       {/* Summary (✅ clickable cards) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <button
@@ -635,10 +675,10 @@ export default function LeaveManagement() {
               • Search: <b className="text-gray-900">{search.trim()}</b>
             </>
           ) : null}
+          </div>
         </div>
-      </div>
 
-      {/* Table */}
+        {/* Table */}
       <div
         id="leave-table"
         className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto"
