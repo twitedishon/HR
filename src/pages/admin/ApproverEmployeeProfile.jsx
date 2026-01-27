@@ -19,6 +19,7 @@ import {
   User,
   CalendarDays,
   CreditCard,
+  Sparkles,
 } from "lucide-react";
 import DocumentManager from "../../components/DocumentManager.jsx";
 import { supabase, isSupabaseConfigured } from "../../lib/supabaseClient";
