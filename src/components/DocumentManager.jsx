@@ -16,7 +16,7 @@ import {
   Check,
   X,
 } from "lucide-react";
-import { supabase } from "../lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import { ensureRoleAuthSession } from "../lib/employeeAuthBridge";
 
 /* ===================== CONFIG ===================== */
@@ -26,6 +26,8 @@ const ALLOWED_ROLES = new Set(["admin", "employee", "hr", "manager", "admin-head
 const AUTH_KEY = "HRMSS_AUTH_SESSION";
 const LEGACY_EMP_SIGNIN_KEY = "hrmss.employee.signin";
 const DOCS_AUTH_KEY = "HRMSS_DOCS_AUTH";
+const OFFLINE_DOCS_PREFIX = "HRMSS_DOCS_OFFLINE";
+const OFFLINE_MAX_BYTES = 4 * 1024 * 1024;
 
 const STATUS_STYLES = {
   pending: "bg-amber-50 text-amber-700 border border-amber-200",
@@ -134,6 +136,23 @@ const stringToUuid = (input) => {
   return `${str.slice(0, 8)}-${str.slice(8, 12)}-${str.slice(12, 16)}-${str.slice(16, 20)}-${str.slice(20, 32)}`;
 };
 
+const safeStorageKey = (value) => String(value || "").replace(/[^\w.-]+/g, "_");
+
+const buildOfflineKey = ({ roleKey, userKey, mode }) => {
+  const r = safeStorageKey(roleKey || "unknown");
+  const u = safeStorageKey(userKey || "anonymous");
+  const m = safeStorageKey(mode || "user");
+  return `${OFFLINE_DOCS_PREFIX}.${m}.${r}.${u}`;
+};
+
+const fileToDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+
 const readAuthCache = () => {
   try {
     const raw = localStorage.getItem(AUTH_KEY);
@@ -196,6 +215,11 @@ const resolvePreferredEmail = ({ authCache, legacyEmployeeSignin } = {}) => {
   return email || undefined;
 };
 
+const isBridgeFailure = (error) =>
+  String(error?.message || error || "")
+    .toLowerCase()
+    .includes(DOCUMENT_BRIDGE_SIGNATURE);
+
 /* ===================== COMPONENT ===================== */
 export default function DocumentManager({
   title = "Documents",
@@ -203,6 +227,8 @@ export default function DocumentManager({
   accent = "blue",
   role,
   canUpload = true,
+  allowAnonymous = false,
+  userIdOverride = null,
   categoryOptions = [
     "Offer Letter",
     "Payslip",
@@ -227,6 +253,7 @@ export default function DocumentManager({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [errMsg, setErrMsg] = useState("");
+  const [offlineMode, setOfflineMode] = useState(false);
 
   const [statusFilter, setStatusFilter] = useState(mode === "hr-review" ? "pending" : "all");
   const [noteModalOpen, setNoteModalOpen] = useState(false);
@@ -237,10 +264,90 @@ export default function DocumentManager({
   const pageRole = String(role || "").trim().toLowerCase();
   const normalizedPageRole = ALLOWED_ROLES.has(pageRole) ? pageRole : null;
 
+  const getOfflineStorageKey = () => {
+    const authCache = readAuthCache();
+    const legacyEmployeeSignin = readLegacyEmployeeSignin();
+    const docsAuth = readDocsAuth();
+
+    const roleKey =
+      normalizedPageRole ||
+      resolveEffectiveRole({ roleProp: role || docsAuth?.role, authCache }) ||
+      role ||
+      docsAuth?.role ||
+      "unknown";
+
+    const userKey =
+      userIdOverride ||
+      resolveEmployeeId({ authCache, legacyEmployeeSignin }) ||
+      authCache?.user_id ||
+      authCache?.userId ||
+      authCache?.id ||
+      docsAuth?.identifier ||
+      docsAuth?.email ||
+      "anonymous";
+
+    return buildOfflineKey({ roleKey, userKey, mode });
+  };
+
+  const readOfflineDocs = () => {
+    try {
+      const raw = localStorage.getItem(getOfflineStorageKey());
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const writeOfflineDocs = (rows) => {
+    try {
+      localStorage.setItem(getOfflineStorageKey(), JSON.stringify(rows || []));
+    } catch {}
+  };
+
   const resetUploadForm = () => {
     setDocTitle("");
     setFile(null);
     if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const uploadOfflineDoc = async (userIdHint) => {
+    if (file.size > OFFLINE_MAX_BYTES) {
+      throw new Error(
+        `Offline mode supports files up to ${Math.round(OFFLINE_MAX_BYTES / (1024 * 1024))}MB.`
+      );
+    }
+
+    const localDataUrl = await fileToDataUrl(file);
+    const stamp = Date.now();
+    const fileName = safeFileName(file.name);
+    const offlineId = stringToUuid(`${stamp}.${fileName}.${docTitle.trim()}`);
+    const isEmployee = normalizedPageRole === "employee";
+
+    const offlineRow = {
+      id: offlineId,
+      user_id: userIdHint || userIdOverride || "offline",
+      role: normalizedPageRole || role || "unknown",
+      title: docTitle.trim(),
+      category,
+      file_name: fileName,
+      mime_type: file.type || null,
+      size_bytes: file.size ?? null,
+      bucket: null,
+      storage_path: null,
+      status: isEmployee ? "pending" : "approved",
+      submitted_at: new Date().toISOString(),
+      reviewed_at: isEmployee ? null : new Date().toISOString(),
+      reviewed_by: isEmployee ? null : (userIdHint || userIdOverride || null),
+      review_note: isEmployee ? null : "Offline upload",
+      created_at: new Date().toISOString(),
+      local_data_url: localDataUrl,
+    };
+
+    const next = [offlineRow, ...(readOfflineDocs() || [])];
+    writeOfflineDocs(next);
+    setDocs(next.map(mapOfflineRowToUi));
+    resetUploadForm();
+    setErrMsg("Uploaded offline. Sync will resume once Supabase is available.");
   };
 
   /* ---------- AUTH: ensure Supabase session (employee bridge) ---------- */
@@ -283,7 +390,13 @@ export default function DocumentManager({
 
     try {
       bridgeInProgress.current = true;
-      await ensureRoleAuthSession({ role: effectiveRole, identifier, preferredEmail, password });
+      await ensureRoleAuthSession({
+        role: effectiveRole,
+        identifier,
+        preferredEmail,
+        password,
+        allowSignup: true,
+      });
     } finally {
       bridgeInProgress.current = false;
     }
@@ -306,9 +419,25 @@ export default function DocumentManager({
     try {
       setErrMsg("");
       setLoading(true);
+      setOfflineMode(false);
+
+      if (!isSupabaseConfigured) {
+        setOfflineMode(true);
+        const offlineRows = readOfflineDocs();
+        setDocs((offlineRows || []).map(mapOfflineRowToUi));
+        setErrMsg("Supabase not configured. Working in offline mode for documents.");
+        return;
+      }
 
       const authed = await getAuthedUser();
       if (!authed?.id) {
+        if (allowAnonymous) {
+          setOfflineMode(true);
+          const offlineRows = readOfflineDocs();
+          setDocs((offlineRows || []).map(mapOfflineRowToUi));
+          setErrMsg("Using offline mode for documents (saved locally in this browser).");
+          return;
+        }
         setDocs([]);
         setErrMsg("Please login (Supabase Auth) to view documents.");
         return;
@@ -360,11 +489,18 @@ export default function DocumentManager({
       );
     } catch (e) {
       console.error("loadDocs error:", e);
-      setDocs([]);
-      if (isRlsDenied(e)) {
-        setErrMsg("Access denied by RLS. Please ensure you are signed in.");
-      } else {
+      if (isBridgeFailure(e) || allowAnonymous) {
+        setOfflineMode(true);
+        const offlineRows = readOfflineDocs();
+        setDocs((offlineRows || []).map(mapOfflineRowToUi));
         setErrMsg(getDocumentErrorMessage(e, "Failed to load documents"));
+      } else {
+        setDocs([]);
+        if (isRlsDenied(e)) {
+          setErrMsg("Access denied by RLS. Please ensure you are signed in.");
+        } else {
+          setErrMsg(getDocumentErrorMessage(e, "Failed to load documents"));
+        }
       }
     } finally {
       setLoading(false);
@@ -419,7 +555,31 @@ export default function DocumentManager({
       if (!file || !docTitle.trim()) return alert("Title & file required");
       setBusy(true);
 
-      const user = await getAuthedUser();
+      if (offlineMode || !isSupabaseConfigured) {
+        await uploadOfflineDoc(userIdOverride);
+        return;
+      }
+
+      let user = null;
+      try {
+        user = await getAuthedUser();
+      } catch (authErr) {
+        if (allowAnonymous || isBridgeFailure(authErr)) {
+          setOfflineMode(true);
+          const offlineRows = readOfflineDocs();
+          setDocs((offlineRows || []).map(mapOfflineRowToUi));
+          setErrMsg(getDocumentErrorMessage(authErr, "Failed to upload document"));
+          return;
+        }
+        throw authErr;
+      }
+
+      const shouldOfflineUpload = allowAnonymous && !user?.id;
+      if (shouldOfflineUpload) {
+        await uploadOfflineDoc(user?.id);
+        return;
+      }
+
       if (!user?.id) {
         setErrMsg("Please sign in (Supabase Auth) to upload documents.");
         setBusy(false);
@@ -486,6 +646,11 @@ export default function DocumentManager({
       setErrMsg("");
       setBusy(true);
 
+      if (doc?.localDataUrl) {
+        window.open(doc.localDataUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+
       const user = await getAuthedUser();
       must(user?.id, "Please login (Supabase Auth) to access documents.");
 
@@ -515,6 +680,13 @@ export default function DocumentManager({
     try {
       setErrMsg("");
       setBusy(true);
+
+      if (offlineMode || doc?.localOnly) {
+        const next = (readOfflineDocs() || []).filter((d) => String(d.id) !== String(doc.id));
+        writeOfflineDocs(next);
+        setDocs(next.map(mapOfflineRowToUi));
+        return;
+      }
 
       const user = await getAuthedUser();
       must(user?.id, "Please login (Supabase Auth) to delete documents.");
@@ -875,7 +1047,9 @@ export default function DocumentManager({
       )}
 
       <p className="text-xs text-gray-400">
-        Connected to Supabase (Storage + DB). Users will see only their own documents (RLS) + role-based access.
+        {offlineMode
+          ? "Offline mode enabled. Documents are stored locally in this browser."
+          : "Connected to Supabase (Storage + DB). Users will see only their own documents (RLS) + role-based access."}
       </p>
 
       {noteModalOpen && selectedDoc && (
@@ -951,6 +1125,32 @@ function mapRowToUi(r) {
     employeeDisplay: r.employeeDisplay || r.user_id || "",
     review_note: r.review_note || "",
     reviewed_at: r.reviewed_at || null,
-    localData: null,
+    localDataUrl: null,
+    localOnly: false,
+  };
+}
+
+function mapOfflineRowToUi(r) {
+  const fileName = r.file_name || r.fileName || "";
+  const type = determineDocType(fileName, r.mime_type || r.mimeType);
+  const dt = r.created_at ? new Date(r.created_at) : r.createdAt ? new Date(r.createdAt) : null;
+
+  return {
+    id: r.id,
+    title: r.title || fileName || "Document",
+    category: r.category || "Other",
+    fileName,
+    size: r.size_bytes ?? r.size ?? null,
+    type,
+    bucket: r.bucket || null,
+    storagePath: r.storage_path || null,
+    date: dt ? dt.toLocaleString() : "-",
+    status: r.status || "pending",
+    employee: r.user_id || "",
+    employeeDisplay: r.employeeDisplay || r.user_id || "",
+    review_note: r.review_note || "",
+    reviewed_at: r.reviewed_at || null,
+    localDataUrl: r.local_data_url || r.localDataUrl || null,
+    localOnly: true,
   };
 }

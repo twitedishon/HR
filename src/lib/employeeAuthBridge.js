@@ -56,6 +56,31 @@ const plusAddress = (email, tag) => {
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const AUTH_BRIDGE_COOLDOWN_PREFIX = "hrmss.docsAuth.cooldown";
+const AUTH_BRIDGE_INFLIGHT = new Map();
+
+const cooldownKeyFor = (role, email) => {
+  const safeRole = String(role || "unknown").toLowerCase();
+  const safeEmail = safeIdForEmail(email || "unknown");
+  return `${AUTH_BRIDGE_COOLDOWN_PREFIX}.${safeRole}.${safeEmail || "unknown"}`;
+};
+
+const readCooldownUntil = (key) => {
+  try {
+    const raw = localStorage.getItem(key);
+    const num = Number(raw || 0);
+    return Number.isFinite(num) ? num : 0;
+  } catch {
+    return 0;
+  }
+};
+
+const setCooldownUntil = (key, until) => {
+  try {
+    localStorage.setItem(key, String(until));
+  } catch {}
+};
+
 /* ---------------------- main ---------------------- */
 export async function ensureAdminSupabaseSession({
   role,
@@ -64,6 +89,8 @@ export async function ensureAdminSupabaseSession({
 
   adminId = null,
   preferredEmail = undefined,
+  allowSignup = true,
+  cooldownMs = 45000,
 }) {
   const { data: sess, error: sessErr } = await supabase.auth.getSession();
   if (sessErr) throw sessErr;
@@ -103,7 +130,22 @@ export async function ensureAdminSupabaseSession({
   const supabasePassword = normalizeSupabasePassword(password);
   console.info(`[AuthBridge] Attempting session for ${r}. Identifier: ${idRaw}, Target Email: ${email}`);
 
+  const inflightKey = `${r}:${email}`;
+  if (AUTH_BRIDGE_INFLIGHT.has(inflightKey)) {
+    return AUTH_BRIDGE_INFLIGHT.get(inflightKey);
+  }
+
   let attemptedEmail = email;
+  const cooldownKey = cooldownKeyFor(r, email);
+  const cooldownUntil = readCooldownUntil(cooldownKey);
+  if (cooldownUntil && cooldownUntil > Date.now()) {
+    throw new Error(
+      `Supabase Auth bridge failed for ${r} (${email}). Cooldown active, try again in ${Math.ceil(
+        (cooldownUntil - Date.now()) / 1000
+      )}s.`
+    );
+  }
+
   async function tryAuth(targetEmail) {
     attemptedEmail = targetEmail;
     const { data: auth, error } = await supabase.auth.signInWithPassword({
@@ -113,12 +155,18 @@ export async function ensureAdminSupabaseSession({
 
     if (error) {
       const msg = String(error.message || "").toLowerCase();
-      const canSignup =
-        msg.includes("invalid login credentials") ||
-        msg.includes("user not found") ||
-        msg.includes("no user") ||
+      const signupBlocked =
         msg.includes("email not confirmed") ||
-        error.status === 400;
+        msg.includes("already registered") ||
+        msg.includes("already in use") ||
+        msg.includes("signup is disabled");
+
+      const canSignup =
+        allowSignup &&
+        !signupBlocked &&
+        (msg.includes("invalid login credentials") ||
+          msg.includes("user not found") ||
+          msg.includes("no user"));
 
       if (canSignup) {
         const { data: signUp, error: signUpErr } = await supabase.auth.signUp({
@@ -141,66 +189,82 @@ export async function ensureAdminSupabaseSession({
     return { user: auth.user };
   }
 
-  let result = await tryAuth(email);
+  const inflightPromise = (async () => {
+    let result = await tryAuth(email);
 
-  // If primary attempt failed for ANY reason, try again or fallback alias
-  if (result.error) {
-    const errMsgRaw = String(result.error.message || "");
-    const errMsg = errMsgRaw.toLowerCase();
-    const isRateLimited =
-      result.error.status === 429 || errMsg.includes("only request this after");
+    // If primary attempt failed for ANY reason, try again or fallback alias
+    if (result.error) {
+      const errMsgRaw = String(result.error.message || "");
+      const errMsg = errMsgRaw.toLowerCase();
+      const isRateLimited =
+        result.error.status === 429 || errMsg.includes("only request this after");
 
-    if (isRateLimited) {
-      // Respect Supabase throttling window before retrying once.
-      const match = errMsgRaw.match(/after\s+(\d+)\s*seconds?/i);
-      const delay = match ? (Number(match[1]) + 1) * 1000 : 45000;
-      console.warn(
-        `[DocsAuth] Supabase rate-limited signup/signin; waiting ${Math.round(
-          delay / 1000
-        )}s before retry.`
-      );
-      await wait(delay);
-      result = await tryAuth(email);
-    }
-
-    // If still failing and not rate-limited, try password-scoped alias
-    if (result.error && !isRateLimited) {
-      const suffix = simpleHash(supabasePassword);
-
-      // For employees, avoid plus-addressing (some providers block it); use hyphenated alias instead.
-      let fallbackEmail = email;
-      if (r === "employee") {
-        const at = email.indexOf("@");
-        if (at !== -1) {
-          const local = email.slice(0, at);
-          const domain = email.slice(at + 1);
-          fallbackEmail = `${local}-${suffix}@${domain}`;
-        }
-      } else {
-        fallbackEmail = plusAddress(email, suffix);
-      }
-
-      if (fallbackEmail && fallbackEmail !== email) {
+      if (isRateLimited) {
+        const match = errMsgRaw.match(/after\s+(\d+)\s*seconds?/i);
+        const delay = match ? (Number(match[1]) + 1) * 1000 : cooldownMs;
         console.warn(
-          `[DocsAuth] Primary attempt failed (${result.error.message}). Retrying with fallback alias: ${fallbackEmail}`
+          `[DocsAuth] Supabase rate-limited signup/signin; cooling down for ${Math.round(
+            delay / 1000
+          )}s before retry.`
         );
-        await wait(400);
-        result = await tryAuth(fallbackEmail);
+        setCooldownUntil(cooldownKey, Date.now() + delay);
+        throw new Error(
+          `Supabase Auth bridge failed for ${r} (${attemptedEmail}). Details: rate limited`
+        );
+      }
+
+      // If still failing and not rate-limited, try password-scoped alias (only when signup is allowed)
+      if (allowSignup) {
+        const suffix = simpleHash(supabasePassword);
+
+        // For employees, avoid plus-addressing (some providers block it); use hyphenated alias instead.
+        let fallbackEmail = email;
+        if (r === "employee") {
+          const at = email.indexOf("@");
+          if (at !== -1) {
+            const local = email.slice(0, at);
+            const domain = email.slice(at + 1);
+            fallbackEmail = `${local}-${suffix}@${domain}`;
+          }
+        } else {
+          fallbackEmail = plusAddress(email, suffix);
+        }
+
+        if (fallbackEmail && fallbackEmail !== email) {
+          console.warn(
+            `[DocsAuth] Primary attempt failed (${result.error.message}). Retrying with fallback alias: ${fallbackEmail}`
+          );
+          await wait(400);
+          result = await tryAuth(fallbackEmail);
+        }
       }
     }
-  }
 
-  if (result.error) {
-    console.error(`[AuthBridge] Bridge failure for ${attemptedEmail}:`, result.error);
-    throw new Error(
-      `Supabase Auth bridge failed for ${r} (${attemptedEmail}). Details: ${result.error.message}`
-    );
-  }
+    if (result.error) {
+      console.error(`[AuthBridge] Bridge failure for ${attemptedEmail}:`, result.error);
+      throw new Error(
+        `Supabase Auth bridge failed for ${r} (${attemptedEmail}). Details: ${result.error.message}`
+      );
+    }
 
-  return result.user;
+    return result.user;
+  })();
+
+  AUTH_BRIDGE_INFLIGHT.set(inflightKey, inflightPromise);
+  try {
+    return await inflightPromise;
+  } finally {
+    AUTH_BRIDGE_INFLIGHT.delete(inflightKey);
+  }
 }
 
-export async function ensureRoleAuthSession({ role, identifier, password, preferredEmail } = {}) {
+export async function ensureRoleAuthSession({
+  role,
+  identifier,
+  password,
+  preferredEmail,
+  allowSignup = false,
+} = {}) {
   const { data: sess, error: sessErr } = await supabase.auth.getSession();
   if (sessErr) throw sessErr;
   if (sess?.session?.user) return sess.session.user;
@@ -212,5 +276,6 @@ export async function ensureRoleAuthSession({ role, identifier, password, prefer
     identifier,
     password,
     preferredEmail,
+    allowSignup,
   });
 }
