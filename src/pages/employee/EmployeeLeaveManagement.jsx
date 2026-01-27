@@ -376,21 +376,9 @@ const MultiApproverSelect = ({ items, valueIds, setValueIds, errorText }) => {
 
   return (
     <div className="space-y-2">
-      <div className="rounded-xl border border-slate-200 p-3 bg-slate-50">
-        <div className="text-xs text-slate-500">Request To</div>
-        <div className="font-semibold text-slate-900">
-          {selectedNames.length ? selectedNames.join(", ") : "No one selected"}
-        </div>
-        <div className="text-[11px] text-slate-600 mt-1">
-          {selectedNames.length
-            ? `${selectedNames.length} selected`
-            : "Select at least 1 approver"}
-        </div>
-      </div>
-
       <div className="rounded-xl border border-slate-200 overflow-hidden">
         <div className="px-3 py-2 bg-white border-b text-xs font-semibold text-slate-700">
-          Approvers (Manager / Reporting Manager)
+          Request To
         </div>
 
         <div className="max-h-44 overflow-y-auto bg-white">

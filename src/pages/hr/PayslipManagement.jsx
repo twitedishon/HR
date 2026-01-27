@@ -351,6 +351,8 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
   const [selectedId, setSelectedId] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  const [sendingKey, setSendingKey] = useState("");
+  const [statModal, setStatModal] = useState(null);
 
   const selected = rows.find((r) => r.id === selectedId) || null;
 
@@ -469,6 +471,38 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
     return { total, sent, months: months.length, totalNet };
   }, [filtered, months]);
 
+  const monthSummary = useMemo(() => {
+    const summary = new Map();
+    rows.forEach((row) => {
+      const key = row.month || "-";
+      const current = summary.get(key) || { total: 0, sent: 0, net: 0 };
+      current.total += 1;
+      current.sent += row.sent ? 1 : 0;
+      current.net += Number(row.net || 0);
+      summary.set(key, current);
+    });
+    return Array.from(summary.entries()).map(([month, info]) => ({
+      month,
+      ...info,
+    }));
+  }, [rows]);
+
+  const sentRows = useMemo(() => filtered.filter((r) => r.sent), [filtered]);
+  const topNetRows = useMemo(
+    () => [...filtered].sort((a, b) => Number(b.net || 0) - Number(a.net || 0)).slice(0, 6),
+    [filtered]
+  );
+
+  const openStatModal = (kind) => {
+    const titleMap = {
+      total: "Total Payslips",
+      sent: "Sent Payslips",
+      months: "Payslip Months",
+      totalNet: "Total Net Pay",
+    };
+    setStatModal({ kind, title: titleMap[kind] || "Details" });
+  };
+
   const markMonthPublished = async (month) => {
     if (!month) return;
 
@@ -487,20 +521,23 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
     }
   };
 
-  const send = async (id) => {
+  const send = async (id, key) => {
     const target = rows.find((r) => r.id === id);
     if (!target) return;
     setSending(true);
+    setSendingKey(key || String(id || ""));
     try {
       await markMonthPublished(target.month);
       setRows((prev) => prev.map((r) => (r.month === target.month ? { ...r, sent: true } : r)));
     } finally {
       setSending(false);
+      setSendingKey("");
     }
   };
 
   const sendAll = async () => {
     setSending(true);
+    setSendingKey("all");
     try {
       const monthsToSend = Array.from(new Set(filtered.map((r) => r.month)));
       for (const m of monthsToSend) {
@@ -509,6 +546,7 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
       setRows((prev) => prev.map((r) => (monthsToSend.includes(r.month) ? { ...r, sent: true } : r)));
     } finally {
       setSending(false);
+      setSendingKey("");
     }
   };
 
@@ -518,6 +556,132 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
     <div className="space-y-6">
       {selected ? (
         <PayslipPreviewModal open={previewOpen} onClose={() => setPreviewOpen(false)} slip={selected} />
+      ) : null}
+
+      {statModal ? (
+        <div
+          className="fixed inset-0 z-[60] bg-black/50 p-4 sm:p-8"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setStatModal(null);
+          }}
+        >
+          <div className="mx-auto w-full max-w-3xl rounded-3xl border bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase">Payslip Summary</p>
+                <h2 className="text-xl font-extrabold text-slate-900">{statModal.title}</h2>
+              </div>
+              <button
+                type="button"
+                className="h-10 w-10 rounded-2xl border bg-white text-slate-700 hover:bg-slate-50"
+                onClick={() => setStatModal(null)}
+              >
+                <X size={18} className="mx-auto" />
+              </button>
+            </div>
+
+            {statModal.kind === "total" ? (
+              <div className="mt-5 space-y-4">
+                <div className="rounded-2xl border overflow-hidden">
+                  <div className="bg-slate-50 px-4 py-2 text-xs font-bold text-slate-600">Recent Payslips</div>
+                  <div className="divide-y">
+                    {filtered.slice(0, 8).map((row) => (
+                      <div key={row.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{row.name}</p>
+                          <p className="text-xs text-slate-500">
+                            {row.employeeId} • {row.month}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-extrabold text-slate-900">{money(row.net)}</p>
+                          <span
+                            className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                              row.sent
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-amber-50 text-amber-700"
+                            }`}
+                          >
+                            {row.sent ? "Sent" : "Pending"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {statModal.kind === "sent" ? (
+              <div className="mt-5 space-y-4">
+                <div className="rounded-2xl border overflow-hidden">
+                  <div className="bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700">Sent Payslips</div>
+                  <div className="divide-y">
+                    {sentRows.slice(0, 8).map((row) => (
+                      <div key={row.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{row.name}</p>
+                          <p className="text-xs text-slate-500">
+                            {row.employeeId} • {row.month}
+                          </p>
+                        </div>
+                        <p className="text-sm font-extrabold text-emerald-700">{money(row.net)}</p>
+                      </div>
+                    ))}
+                    {!sentRows.length ? (
+                      <div className="px-4 py-4 text-sm text-slate-500">No sent payslips for this filter.</div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {statModal.kind === "months" ? (
+              <div className="mt-5 space-y-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {monthSummary.map((m) => (
+                    <div key={m.month} className="rounded-2xl border bg-white px-4 py-3">
+                      <p className="text-sm font-extrabold text-slate-900">{m.month}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {m.total} payslip{m.total === 1 ? "" : "s"} • {m.sent} sent
+                      </p>
+                      <p className="mt-2 text-sm font-semibold text-slate-700">{money(m.net)}</p>
+                    </div>
+                  ))}
+                  {!monthSummary.length ? (
+                    <div className="rounded-2xl border bg-white px-4 py-6 text-sm text-slate-500">
+                      No months available.
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
+            {statModal.kind === "totalNet" ? (
+              <div className="mt-5 space-y-4">
+                <div className="rounded-2xl border overflow-hidden">
+                  <div className="bg-slate-50 px-4 py-2 text-xs font-bold text-slate-600">Highest Net Payslips</div>
+                  <div className="divide-y">
+                    {topNetRows.map((row) => (
+                      <div key={row.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{row.name}</p>
+                          <p className="text-xs text-slate-500">
+                            {row.employeeId} • {row.month}
+                          </p>
+                        </div>
+                        <p className="text-sm font-extrabold text-slate-900">{money(row.net)}</p>
+                      </div>
+                    ))}
+                    {!topNetRows.length ? (
+                      <div className="px-4 py-4 text-sm text-slate-500">No payslips available.</div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
       ) : null}
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -555,40 +719,28 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
       <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
         <button
           className="rounded-2xl border bg-white p-4 shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer text-left"
-          onClick={() => {
-            // Handle Total Payslips click
-            console.log('Total Payslips clicked');
-          }}
+          onClick={() => openStatModal("total")}
         >
           <p className="text-xs font-semibold text-slate-500 uppercase">Total Payslips</p>
           <p className="mt-1 text-2xl font-extrabold text-slate-900">{stats.total}</p>
         </button>
         <button
           className="rounded-2xl border bg-white p-4 shadow-sm hover:bg-emerald-50 hover:border-emerald-300 transition-all cursor-pointer text-left"
-          onClick={() => {
-            // Handle Sent click
-            console.log('Sent clicked');
-          }}
+          onClick={() => openStatModal("sent")}
         >
           <p className="text-xs font-semibold text-slate-500 uppercase">Sent</p>
           <p className="mt-1 text-2xl font-extrabold text-emerald-700">{stats.sent}</p>
         </button>
         <button
           className="rounded-2xl border bg-white p-4 shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer text-left"
-          onClick={() => {
-            // Handle Months click
-            console.log('Months clicked');
-          }}
+          onClick={() => openStatModal("months")}
         >
           <p className="text-xs font-semibold text-slate-500 uppercase">Months</p>
           <p className="mt-1 text-2xl font-extrabold text-slate-900">{stats.months}</p>
         </button>
         <button
           className="rounded-2xl border bg-white p-4 shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer text-left"
-          onClick={() => {
-            // Handle Total Net click
-            console.log('Total Net clicked');
-          }}
+          onClick={() => openStatModal("totalNet")}
         >
           <p className="text-xs font-semibold text-slate-500 uppercase">Total Net</p>
           <p className="mt-1 text-2xl font-extrabold text-slate-900">{money(stats.totalNet)}</p>
@@ -622,16 +774,7 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
             </select>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <button className="inline-flex items-center gap-2 rounded-2xl border bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50">
-              <Filter size={16} />
-              Advanced Filters
-            </button>
-            <button className="inline-flex items-center gap-2 rounded-2xl border bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50">
-              <Download size={16} />
-              Export CSV
-            </button>
-          </div>
+          
         </div>
 
         <div className="mt-4 overflow-hidden rounded-2xl border">
@@ -684,10 +827,10 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
                     <button
                       type="button"
                       className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:opacity-95 disabled:opacity-60"
-                      disabled={sending}
+                      disabled={sendingKey === `row:${row.id}` || sendingKey === "all"}
                       onClick={(e) => {
                         e.stopPropagation();
-                        send(row.id);
+                        send(row.id, `row:${row.id}`);
                       }}
                     >
                       {row.sent ? "Resend" : "Send"}
@@ -746,9 +889,9 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => send(selected.id)}
+                  onClick={() => send(selected.id, `selected:${selected.id}`)}
                   className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:opacity-95 disabled:opacity-60"
-                  disabled={sending}
+                  disabled={sendingKey === `selected:${selected.id}` || sendingKey === "all"}
                 >
                   <Mail size={16} />
                   Send to Employee
@@ -768,10 +911,7 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
                 </div>
               </div>
 
-              <div className="rounded-2xl border bg-slate-50 px-4 py-3">
-                <p className="text-xs font-semibold text-slate-500 uppercase">Quick Actions</p>
-                <p className="text-sm text-slate-700">View preview or send the payslip.</p>
-              </div>
+             
 
               <div className="grid grid-cols-1 gap-3">
                 <button
@@ -790,9 +930,9 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => send(selected.id)}
+                  onClick={() => send(selected.id, `quick:${selected.id}`)}
                   className="inline-flex items-center justify-between rounded-2xl bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:opacity-95 disabled:opacity-60"
-                  disabled={sending}
+                  disabled={sendingKey === `quick:${selected.id}` || sendingKey === "all"}
                 >
                   Send Now <Send size={16} />
                 </button>

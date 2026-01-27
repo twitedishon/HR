@@ -31,7 +31,7 @@ const Sidebar = () => {
           Documents
         </NavLink>
         <NavLink to="/dashboard/career-guidance" className={linkClasses}>
-          Career Guidance
+          Career Ladder
         </NavLink>
 
       </nav>

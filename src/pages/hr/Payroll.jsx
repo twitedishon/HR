@@ -657,14 +657,22 @@ export default function PayrollPage() {
   const fetchDetailsForEmployee = async (empId) => {
     if (!empId) return;
 
-    const profRes = await supabase
-      .from(PROFILE_TABLE)
-      .select("employee_id, bank_name, account_number, ifsc_code, branch")
-      .eq("employee_id", empId)
-      .maybeSingle();
+    const [profRes, empRes] = await Promise.all([
+      supabase
+        .from(PROFILE_TABLE)
+        .select("employee_id, bank_name, account_number, ifsc_code, branch")
+        .eq("employee_id", empId)
+        .maybeSingle(),
+      supabase
+        .from(EMP_TABLE)
+        .select("employee_id, bank_name, account_number, ifsc_code, branch")
+        .eq("employee_id", empId)
+        .maybeSingle(),
+    ]);
 
-    if (!profRes.error) setBankInfo(profRes.data || null);
-    else setBankInfo(null);
+    const profRow = !profRes.error ? profRes.data : null;
+    const empRow = !empRes.error ? empRes.data : null;
+    setBankInfo(profRow || empRow || null);
 
     try {
       const { startDate, endDate } = periodRange;
@@ -711,6 +719,13 @@ export default function PayrollPage() {
     if (tab === "details" && selectedEmpId) fetchDetailsForEmployee(selectedEmpId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, selectedEmpId, periodKey]);
+
+  useEffect(() => {
+    if (activeAction === "payslip" && actionEmpId) {
+      fetchDetailsForEmployee(actionEmpId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAction, actionEmpId, periodKey]);
 
   /* ---------------- ACTIONS ---------------- */
   const openActionDetails = (key) => setActiveAction(key);

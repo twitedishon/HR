@@ -80,6 +80,11 @@ const CareerGuidance = () => {
   const designation = profile?.designation?.toLowerCase() || "";
   const department = profile?.department?.toLowerCase() || "";
   
+  const isBusinessDev =
+    department.includes("business development") ||
+    designation.includes("business development") ||
+    designation.includes("bde");
+
   // Check if user is in a technology role (AI, Intern, Developer, UI/UX, etc.)
   const isTechRole = 
     designation.includes("ai") || 
@@ -90,7 +95,12 @@ const CareerGuidance = () => {
     department.includes("engineering") ||
     department.includes("product");
 
-  const matrixData = !isTechRole ? [
+  const matrixData = isBusinessDev ? [
+    { icon: Briefcase, color: "text-purple-600", title: "Business Development Manager (BDM)", exp: "Minimum 5+ years" },
+    { icon: Users, color: "text-blue-500", title: "Sr. Business Development Executive (Sr.BDE)", exp: "3+ years" },
+    { icon: UserCheck, color: "text-teal-500", title: "Business Development Executive (BDE)", exp: "1–2 years" },
+    { icon: GraduationCap, color: "text-orange-500", title: "Business Development Interns", exp: "Final-year MBA / Any graduate with sales interest" },
+  ] : !isTechRole ? [
     { icon: UserPlus, color: "text-purple-500", title: "Trainee IT Recruiter", exp: "Fresher" },
     { icon: Phone, color: "text-blue-600", title: "IT Recruiter", exp: "> 1yr" },
     { icon: UserCheck, color: "text-orange-500", title: "Talent Acquisition Executive", exp: "1 - 2.5yr" },
@@ -109,6 +119,11 @@ const CareerGuidance = () => {
     { icon: Star, color: "text-yellow-500", title: "Head of Engineering / CTO", exp: "12+ years" },
   ];
 
+  const rungCount = matrixData.length;
+  const rungGap = 85;
+  const topOffset = 30;
+  const ladderHeight = topOffset + Math.max(0, rungCount - 1) * rungGap + 80;
+
   return (
     <div className="p-6 md:p-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
       {/* Header Section */}
@@ -119,58 +134,98 @@ const CareerGuidance = () => {
               Designation & Experience Matrix
             </h1>
             <p className="text-slate-500 mt-2 font-medium">
-              Twite AI Technologies • <span className="text-purple-600 font-bold">{!isTechRole ? "Talent Acquisition" : "Technology"} Division</span>
+              Twite AI Technologies • <span className="text-purple-600 font-bold">{isBusinessDev ? "Business Development" : !isTechRole ? "Talent Acquisition" : "Technology"} Division</span>
             </p>
           </div>
         </div>
       </div>
 
-      {/* Card Grid */}
-      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-        {matrixData.map((row, idx) => (
-          <div 
-            key={idx} 
-            className="group bg-white rounded-[24px] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 hover:shadow-2xl hover:shadow-purple-100 transition-all duration-300 hover:-translate-y-1 relative overflow-hidden"
-          >
-            {/* Subtle Gradient background on hover */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-50 rounded-full -mr-16 -mt-16 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-
-            <div className="flex gap-5 relative z-10">
-              {/* Primary Icon */}
-              <div className="flex flex-col gap-4">
-                <div className={`w-14 h-14 rounded-2xl ${row.color.replace('text', 'bg')}/10 ${row.color} flex items-center justify-center`}>
-                  <row.icon size={28} strokeWidth={2.5} />
-                </div>
-                {/* Visual Connector Line (Only for Tech paths) */}
-                {isTechRole && idx < matrixData.length - 1 && (
-                  <div className="mx-auto w-0.5 h-full bg-slate-50 min-h-[20px]"></div>
-                )}
-              </div>
-
-              {/* Text Details */}
-              <div className="flex-1 pt-1">
-                <h3 className="text-[19px] font-bold text-[#1e293b] leading-tight group-hover:text-purple-700 transition-colors">
-                  {row.title}
-                </h3>
-                
-                <div className="mt-4 flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-slate-50 text-slate-400 flex items-center justify-center">
-                      {!isTechRole ? <Briefcase size={16} /> : <Laptop size={16} />}
+      {/* Career Ladder */}
+      <div className="max-w-6xl mx-auto py-10">
+        <div className="relative flex justify-center">
+          {/* Blue Ladder Structure */}
+          <div className="absolute left-0 top-0 w-48" style={{ height: `${ladderHeight}px` }}>
+            {/* Left vertical beam */}
+            <div className="absolute left-0 top-0 w-8 h-full bg-blue-500 rounded-lg shadow-md" />
+            {/* Right vertical beam */}
+            <div className="absolute right-0 top-0 w-8 h-full bg-blue-500 rounded-lg shadow-md" />
+            {/* Rungs */}
+            {[...Array(rungCount)].map((_, i) => {
+              const currentStep = matrixData.slice().reverse()[i];
+              const isSeniorSoftwareDev = currentStep?.title.toLowerCase().includes("senior software developer");
+              const rungNumber = String(rungCount - i).padStart(2, "0");
+              
+              return (
+                <div
+                  key={i}
+                  className="absolute left-0 w-full h-8 bg-blue-400 rounded-full shadow-md flex items-center justify-between px-2"
+                  style={{ top: `${topOffset + i * rungGap}px` }}
+                >
+                  {/* Number on left side of rung */}
+                  <span className="text-white font-bold text-xs">{rungNumber}</span>
+                  
+                  {/* Employee position indicator on ladder rung */}
+                  {isSeniorSoftwareDev && (
+                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center border-2 border-white shadow-md">
+                      <User size={12} className="text-white" />
                     </div>
+                  )}
+                  
+                  {/* Empty space on right if no employee indicator */}
+                  {!isSeniorSoftwareDev && <div className="w-6 h-6"></div>}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Steps and Captions */}
+          <div className="relative w-full max-w-2xl pl-32" style={{ height: `${ladderHeight}px` }}>
+            {matrixData.slice().reverse().map((row, idx) => {
+              const originalIdx = matrixData.length - 1 - idx;
+              const step = String(originalIdx + 1).padStart(2, "0");
+              const palette = [
+                { circle: "#A78BFA", dot: "#8B5CF6" }, // Purple
+                { circle: "#F87171", dot: "#EF4444" }, // Red
+                { circle: "#EC4899", dot: "#E879F9" }, // Pink
+                { circle: "#FBBF24", dot: "#F59E0B" }, // Orange
+                { circle: "#FCD34D", dot: "#FACC15" }, // Yellow
+              ];
+              const tone = palette[originalIdx % palette.length];
+
+              return (
+                <div
+                  key={originalIdx}
+                  className="absolute flex items-center"
+                  style={{
+                    top: `${topOffset + idx * rungGap - 16}px`,
+                    width: '100%',
+                    justifyContent: 'flex-start'
+                  }}
+                >
+                  {/* Circular Step on the ladder */}
+                  <div
+                    className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg"
+                    style={{ backgroundColor: tone.circle, marginLeft: '-24px' }}
+                  >
+                    <span className="text-white font-bold text-lg">{step}</span>
+                  </div>
+
+                  {/* Caption to the right */}
+                  <div className="flex items-center ml-8 flex-grow">
+                    <div
+                      className="w-3 h-3 rounded-full mr-3"
+                      style={{ backgroundColor: tone.dot }}
+                    />
                     <div>
-                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none mb-1">Relevant Experience</p>
-                      <p className="text-sm font-bold text-slate-700">{row.exp}</p>
+                      <h3 className="font-bold text-gray-800 text-lg">{row.title}</h3>
+                      <p className="text-sm text-gray-600">{row.exp}</p>
                     </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Status Indicator Bar */}
-              <div className="w-1 rounded-full bg-slate-50 h-10 my-auto group-hover:bg-purple-200 transition-colors"></div>
-            </div>
+              );
+            })}
           </div>
-        ))}
+        </div>
       </div>
 
       {/* Footer Branding */}

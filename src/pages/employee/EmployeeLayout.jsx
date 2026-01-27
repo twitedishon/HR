@@ -41,7 +41,7 @@ const tabs = [
   { to: "leave", icon: CalendarDays, label: "Leave" },
   { to: "documents", icon: FileText, label: "Documents" },
   { to: "payslips", icon: FileText, label: "Payslips" },
-  { to: "career-guidance", icon: Compass, label: "Career Guidance" },
+  { to: "career-guidance", icon: Compass, label: "Career Ladder" },
 
   // { to: "/employee-dashboard/people", icon: UserRound, label: "People Directory" },
 ];

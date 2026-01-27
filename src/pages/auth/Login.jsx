@@ -266,6 +266,30 @@ export default function Login() {
     return !!data;
   };
 
+  // ✅ Check Employee profile completion in hrmss_employee_profiles
+  const employeeProfileCompleted = async (employeeId, email) => {
+    const empId = String(employeeId || "").trim();
+    const empEmail = String(email || "").trim();
+    if (!empId && !empEmail) return false;
+
+    let query = supabase
+      .from("hrmss_employee_profiles")
+      .select("profile_completed");
+
+    if (empId) {
+      query = query.eq("employee_id", empId);
+    } else {
+      query = query.or(
+        `official_email.eq.${empEmail},personal_email.eq.${empEmail}`
+      );
+    }
+
+    const { data, error } = await query.maybeSingle();
+
+    if (error) throw error;
+    return !!data?.profile_completed;
+  };
+
   /* ---------------- SUPABASE AUTH BRIDGE (FOR DOCUMENTS) ---------------- */
 
   const persistDocsAuth = (params) => {
@@ -644,11 +668,15 @@ export default function Login() {
           targetRole
         );
 
-        const userId =
-          session?.user_id || session?.id || session?.userId || null;
-        const completed =
-          isCompleted("employee") ||
-          (userId ? await appProfileExists(userId) : false);
+        const employeeId =
+          session?.employee_id ||
+          session?.employeeId ||
+          session?.id ||
+          session?.user_id ||
+          session?.userId ||
+          null;
+
+        const completed = await employeeProfileCompleted(employeeId, empEmail);
 
         localStorage.setItem(
           COMPLETION_KEY("employee"),
