@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertCircle } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import { formatDDMMYYYY, formatTimeHHMM } from "../../lib/dateUtils";
+import { notifyManagerNewRequest } from "../../lib/notificationUtils";
 
 /* ---------------- STORAGE HELPERS ---------------- */
 const safeJson = (v) => {
@@ -73,13 +74,13 @@ const getUserFromStorage = (wantedRole) => {
   const matchesRole = (o) => {
     const role = String(
       o?.role ||
-        o?.loginRole ||
-        o?.login_role ||
-        o?.userRole ||
-        o?.type ||
-        o?.user_type ||
-        o?.userType ||
-        ""
+      o?.loginRole ||
+      o?.login_role ||
+      o?.userRole ||
+      o?.type ||
+      o?.user_type ||
+      o?.userType ||
+      ""
     )
       .toLowerCase()
       .trim();
@@ -243,10 +244,10 @@ const mapRequestsDbToUi = (
     allowRoleMatch && (roleText.includes("admin-head") || roleText === "admin");
   const assignedToMe = adminId
     ? recipients.some(
-        (rec) => String(rec.id || rec.request_to_id || "").toLowerCase() === adminId
-      ) ||
-      String(r.request_to_id || "").toLowerCase() === adminId ||
-      roleMatchesAdmin
+      (rec) => String(rec.id || rec.request_to_id || "").toLowerCase() === adminId
+    ) ||
+    String(r.request_to_id || "").toLowerCase() === adminId ||
+    roleMatchesAdmin
     : false;
 
   return {
@@ -255,13 +256,13 @@ const mapRequestsDbToUi = (
     ownerId: r.owner_id || "",
     ownerName: nameMap.get(String(r.owner_id || "")) || r.owner_name || "",
     leaveType: r.leave_type,
-  leaveMode: r.mode || "Full Day",
-  from: r.from_date,
-  to: r.to_date || r.from_date,
-  timeFrom: r.time_from || "",
-  timeTo: r.time_to || "",
-  hours: r.hours || "",
-  reason: r.reason,
+    leaveMode: r.mode || "Full Day",
+    from: r.from_date,
+    to: r.to_date || r.from_date,
+    timeFrom: r.time_from || "",
+    timeTo: r.time_to || "",
+    hours: r.hours || "",
+    reason: r.reason,
     status: r.status,
     appliedAt: r.applied_at,
     requestedTo: r.requested_to || [], // optional
@@ -413,7 +414,7 @@ const LeaveManagement = () => {
 
       const nameMap = new Map();
       const adminId = String(currentAdmin?.id || "").toLowerCase();
-      
+
       // ✅ employee: fetch from hrmss_leave_requests using owner_role/owner_id
       if (activeMode === "employee") {
         if (!currentEmployee?.id && !currentAdmin?.id) {
@@ -800,7 +801,23 @@ const LeaveManagement = () => {
               .from(LEAVES_TABLE)
               .insert(rowsToInsert);
 
-            if (mgrError) managerSendError = mgrError.message;
+            if (mgrError) {
+              managerSendError = mgrError.message;
+            } else {
+              // ✅ Notify the approver manager about the new leave request
+              try {
+                await notifyManagerNewRequest({
+                  managerId: approverMgr.id,
+                  managerName: approverMgr.name,
+                  employeeName: currentAdmin.name,
+                  leaveType: leaveType,
+                  fromDate: from,
+                  toDate: leaveMode === "Full Day" ? to : from,
+                });
+              } catch (notifErr) {
+                console.warn("Manager notification failed:", notifErr?.message || notifErr);
+              }
+            }
           }
         }
       } catch (mgrError) {
@@ -892,9 +909,8 @@ const LeaveManagement = () => {
                 setSummaryOpen(false);
                 setViewing(null);
               }}
-              className={`px-6 py-2 rounded-lg text-sm font-medium transition ${
-                mode === "employee" ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50"
-              }`}
+              className={`px-6 py-2 rounded-lg text-sm font-medium transition ${mode === "employee" ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50"
+                }`}
             >
               Employee
             </button>
@@ -908,9 +924,8 @@ const LeaveManagement = () => {
                 setSummaryOpen(false);
                 setViewing(null);
               }}
-              className={`px-6 py-2 rounded-lg text-sm font-medium transition ${
-                mode === "admin" ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50"
-              }`}
+              className={`px-6 py-2 rounded-lg text-sm font-medium transition ${mode === "admin" ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50"
+                }`}
             >
               Admin
             </button>
@@ -932,7 +947,7 @@ const LeaveManagement = () => {
               ? currentAdmin?.id
                 ? "Admin can view all employee leave letters."
                 : "Employee can view only their own leave letters."
-            : "Admin can apply leave and act on requests assigned to them."}
+              : "Admin can apply leave and act on requests assigned to them."}
           </p>
         </div>
 
@@ -949,9 +964,8 @@ const LeaveManagement = () => {
                 setSummaryOpen(false);
                 setViewing(null);
               }}
-              className={`px-6 py-2 rounded-lg text-sm font-medium transition ${
-                mode === "employee" ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50"
-              }`}
+              className={`px-6 py-2 rounded-lg text-sm font-medium transition ${mode === "employee" ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50"
+                }`}
             >
               Employee
             </button>
@@ -965,9 +979,8 @@ const LeaveManagement = () => {
                 setSummaryOpen(false);
                 setViewing(null);
               }}
-              className={`px-6 py-2 rounded-lg text-sm font-medium transition ${
-                mode === "admin" ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50"
-              }`}
+              className={`px-6 py-2 rounded-lg text-sm font-medium transition ${mode === "admin" ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50"
+                }`}
             >
               Admin
             </button>
@@ -1016,7 +1029,7 @@ const LeaveManagement = () => {
             <div className="px-5 py-4 max-h-[70vh] overflow-y-auto">
               <div className="grid grid-cols-1 gap-3">
                 <div className="border border-gray-200 rounded-xl p-3">
-                <div className="text-xs text-gray-500 mb-2">Request To (Manager only)</div>
+                  <div className="text-xs text-gray-500 mb-2">Request To (Manager only)</div>
                   <div className="flex flex-wrap gap-2">
                     {APPROVER_OPTIONS.map((opt) => {
                       const active = requestedTo.includes(opt);
@@ -1025,11 +1038,10 @@ const LeaveManagement = () => {
                           key={opt}
                           type="button"
                           onClick={() => toggleRequestedTo(opt)}
-                          className={`px-3 py-2 rounded-xl text-sm border transition ${
-                            active
-                              ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-white hover:bg-gray-50 border-gray-200 text-gray-800"
-                          }`}
+                          className={`px-3 py-2 rounded-xl text-sm border transition ${active
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "bg-white hover:bg-gray-50 border-gray-200 text-gray-800"
+                            }`}
                         >
                           {opt}
                         </button>
@@ -1037,10 +1049,10 @@ const LeaveManagement = () => {
                     })}
                   </div>
                   <div className="text-[11px] text-gray-500 mt-2">
-                Selected:{" "}
-                <span className="font-semibold">
-                  {requestedTo.length ? requestedTo.join(", ") : "None"}
-                </span>{" "}
+                    Selected:{" "}
+                    <span className="font-semibold">
+                      {requestedTo.length ? requestedTo.join(", ") : "None"}
+                    </span>{" "}
                     (manager only)
                   </div>
                 </div>
@@ -1105,11 +1117,10 @@ const LeaveManagement = () => {
                       <button
                         type="button"
                         onClick={() => setHalfSession("First Half")}
-                        className={`text-left border rounded-xl p-3 transition ${
-                          halfSession === "First Half"
-                            ? "bg-blue-600 text-white border-blue-600"
-                            : "bg-white hover:bg-gray-50 border-gray-200"
-                        }`}
+                        className={`text-left border rounded-xl p-3 transition ${halfSession === "First Half"
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white hover:bg-gray-50 border-gray-200"
+                          }`}
                       >
                         <div className="text-sm font-semibold">First Half</div>
                         <div className={`text-xs mt-1 ${halfSession === "First Half" ? "text-white/80" : "text-gray-500"}`}>
@@ -1120,11 +1131,10 @@ const LeaveManagement = () => {
                       <button
                         type="button"
                         onClick={() => setHalfSession("Second Half")}
-                        className={`text-left border rounded-xl p-3 transition ${
-                          halfSession === "Second Half"
-                            ? "bg-blue-600 text-white border-blue-600"
-                            : "bg-white hover:bg-gray-50 border-gray-200"
-                        }`}
+                        className={`text-left border rounded-xl p-3 transition ${halfSession === "Second Half"
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white hover:bg-gray-50 border-gray-200"
+                          }`}
                       >
                         <div className="text-sm font-semibold">Second Half</div>
                         <div className={`text-xs mt-1 ${halfSession === "Second Half" ? "text-white/80" : "text-gray-500"}`}>
@@ -1595,50 +1605,50 @@ const LeaveManagement = () => {
                 </div>
 
                 <div className="rounded-2xl bg-white border border-slate-100 p-3 shadow-sm">
-                   <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Recipient(s)</p>
-                   <div className="mt-1 flex flex-wrap gap-1">
-                      {viewing.recipients && viewing.recipients.length > 0 ? (
-                        viewing.recipients.map((rec, i) => (
-                          <span key={i} className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full uppercase truncate max-w-[80px]">
-                            {rec.role}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-[10px] font-bold text-slate-400">NONE</span>
-                      )}
-                   </div>
+                  <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Recipient(s)</p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {viewing.recipients && viewing.recipients.length > 0 ? (
+                      viewing.recipients.map((rec, i) => (
+                        <span key={i} className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full uppercase truncate max-w-[80px]">
+                          {rec.role}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-[10px] font-bold text-slate-400">NONE</span>
+                    )}
+                  </div>
                 </div>
               </div>
 
               {/* Dates Flow */}
               <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4">
-                 <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Schedule</p>
-                 <div className="flex items-center justify-between text-sm">
-                    <div className="text-center flex-1">
-                      <p className="text-xs font-bold text-slate-400 uppercase">From</p>
-                      <p className="mt-1 font-extrabold text-slate-800">{fmtDMY(viewing.from)}</p>
-                    </div>
-                    <div className="px-4 text-slate-200">
-                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-                    </div>
-                    <div className="text-center flex-1">
-                      <p className="text-xs font-bold text-slate-400 uppercase">To</p>
-                      <p className="mt-1 font-extrabold text-slate-800">{fmtDMY(viewing.to)}</p>
-                    </div>
-                 </div>
-                 
-                 {(viewing.leaveMode === "Permission" || viewing.leaveMode === "Half Day") && (
-                   <div className="mt-3 pt-3 border-t border-slate-200/50 flex items-center justify-center gap-4 text-xs font-bold text-indigo-600 bg-white/60 py-1.5 rounded-lg border border-slate-100">
-                      <span className="inline-flex items-center justify-center h-4 w-4 text-indigo-600" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                          <circle cx="12" cy="12" r="10" />
-                          <polyline points="12 6 12 12 16 14" />
-                        </svg>
-                      </span>
-                      <span>{viewing.timeFrom || "--:--"}  {viewing.timeTo || "--:--"}</span>
-                      {viewing.hours && <span className="bg-indigo-600 text-white px-2 py-0.5 rounded-full text-[10px]">{viewing.hours}</span>}
-                   </div>
-                 )}
+                <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Schedule</p>
+                <div className="flex items-center justify-between text-sm">
+                  <div className="text-center flex-1">
+                    <p className="text-xs font-bold text-slate-400 uppercase">From</p>
+                    <p className="mt-1 font-extrabold text-slate-800">{fmtDMY(viewing.from)}</p>
+                  </div>
+                  <div className="px-4 text-slate-200">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                  </div>
+                  <div className="text-center flex-1">
+                    <p className="text-xs font-bold text-slate-400 uppercase">To</p>
+                    <p className="mt-1 font-extrabold text-slate-800">{fmtDMY(viewing.to)}</p>
+                  </div>
+                </div>
+
+                {(viewing.leaveMode === "Permission" || viewing.leaveMode === "Half Day") && (
+                  <div className="mt-3 pt-3 border-t border-slate-200/50 flex items-center justify-center gap-4 text-xs font-bold text-indigo-600 bg-white/60 py-1.5 rounded-lg border border-slate-100">
+                    <span className="inline-flex items-center justify-center h-4 w-4 text-indigo-600" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                    </span>
+                    <span>{viewing.timeFrom || "--:--"}  {viewing.timeTo || "--:--"}</span>
+                    {viewing.hours && <span className="bg-indigo-600 text-white px-2 py-0.5 rounded-full text-[10px]">{viewing.hours}</span>}
+                  </div>
+                )}
               </div>
 
               {/* Reason */}
@@ -1652,8 +1662,8 @@ const LeaveManagement = () => {
               {/* Status synchronization info for admin */}
               {mode === "employee" && currentAdmin?.id && (
                 <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 text-[11px] text-amber-700 flex items-start gap-2 italic">
-                   <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                   <span>Admin View: You are viewing an employee's request. Decisions are made by HR/Managers.</span>
+                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                  <span>Admin View: You are viewing an employee's request. Decisions are made by HR/Managers.</span>
                 </div>
               )}
             </div>
@@ -1666,11 +1676,10 @@ const LeaveManagement = () => {
                     type="button"
                     disabled={Boolean(actionLoading)}
                     onClick={() => actOnRequest("Rejected")}
-                    className={`w-full px-4 py-3 rounded-2xl text-sm font-bold border ${
-                      actionLoading === "Rejected"
-                        ? "bg-rose-100 text-rose-700 border-rose-200 opacity-80"
-                        : "bg-white text-rose-700 border-rose-200 hover:bg-rose-50"
-                    }`}
+                    className={`w-full px-4 py-3 rounded-2xl text-sm font-bold border ${actionLoading === "Rejected"
+                      ? "bg-rose-100 text-rose-700 border-rose-200 opacity-80"
+                      : "bg-white text-rose-700 border-rose-200 hover:bg-rose-50"
+                      }`}
                   >
                     {actionLoading === "Rejected" ? "Rejecting..." : "Reject"}
                   </button>
@@ -1678,11 +1687,10 @@ const LeaveManagement = () => {
                     type="button"
                     disabled={Boolean(actionLoading)}
                     onClick={() => actOnRequest("Approved")}
-                    className={`w-full px-4 py-3 rounded-2xl text-sm font-bold border ${
-                      actionLoading === "Approved"
-                        ? "bg-emerald-100 text-emerald-700 border-emerald-200 opacity-80"
-                        : "bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700"
-                    }`}
+                    className={`w-full px-4 py-3 rounded-2xl text-sm font-bold border ${actionLoading === "Approved"
+                      ? "bg-emerald-100 text-emerald-700 border-emerald-200 opacity-80"
+                      : "bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700"
+                      }`}
                   >
                     {actionLoading === "Approved" ? "Approving..." : "Approve"}
                   </button>

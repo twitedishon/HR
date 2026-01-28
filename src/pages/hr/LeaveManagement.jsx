@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import { formatDDMMYYYY } from "../../lib/dateUtils";
+import { notifyManagerNewRequest } from "../../lib/notificationUtils";
 
 /* ===================== CONFIG ===================== */
 const APPROVERS_TABLE = "hrmss_approvers";
@@ -25,7 +26,7 @@ const getHRFromStorage = () => {
           name: user?.full_name || user?.name || "HR Admin",
         };
       }
-    } catch (e) {}
+    } catch (e) { }
   }
   return { id: "HR-001", name: "HR" };
 };
@@ -96,9 +97,8 @@ const calcDuration = (from, to) => {
   if (diff <= 0) return "";
   const h = Math.floor(diff / 60);
   const m = diff % 60;
-  return `${h ? `${h} Hour${h > 1 ? "s" : ""}` : ""}${h && m ? " " : ""}${
-    m ? `${m} Minutes` : ""
-  }`;
+  return `${h ? `${h} Hour${h > 1 ? "s" : ""}` : ""}${h && m ? " " : ""}${m ? `${m} Minutes` : ""
+    }`;
 };
 
 const normalizeRequestedTo = (raw) => {
@@ -270,9 +270,9 @@ export default function LeaveManagement() {
       // Admin leaves table only relevant when viewing employees (admin-origin leave directed to HR)
       !isHrView
         ? supabase
-            .from(ADMIN_LEAVES_TABLE)
-            .select("*")
-            .order("applied_at", { ascending: false })
+          .from(ADMIN_LEAVES_TABLE)
+          .select("*")
+          .order("applied_at", { ascending: false })
         : Promise.resolve({ data: [], error: null }),
     ]);
 
@@ -321,42 +321,42 @@ export default function LeaveManagement() {
         includesHrRequest(r.requested_to ?? r.request_to ?? r.requestedTo)
       )
       .map((r) => {
-      const mode = (r.mode ?? "").toString();
-      const fromDate = r.from_date;
-      const toDate = r.to_date || r.from_date;
+        const mode = (r.mode ?? "").toString();
+        const fromDate = r.from_date;
+        const toDate = r.to_date || r.from_date;
 
-      const tf = shortTime(r.time_from);
-      const tt = shortTime(r.time_to);
+        const tf = shortTime(r.time_from);
+        const tt = shortTime(r.time_to);
 
-      return {
-        id: r.id,
+        return {
+          id: r.id,
 
-        ownerRole: "admin",
-        ownerId: r.admin_id,
-        ownerName: r.admin_name,
+          ownerRole: "admin",
+          ownerId: r.admin_id,
+          ownerName: r.admin_name,
 
-        requestToId: currentHR.id,
-        requestToName: currentHR.name,
-        requestToRole: "hr",
+          requestToId: currentHR.id,
+          requestToName: currentHR.name,
+          requestToRole: "hr",
 
-        leaveType: r.leave_type,
-        mode,
-        from: fromDate,
-        to: toDate,
-        timeFrom: tf,
-        timeTo: tt,
-        hours: r.hours || (needsTime(mode) ? calcDuration(tf, tt) : null),
+          leaveType: r.leave_type,
+          mode,
+          from: fromDate,
+          to: toDate,
+          timeFrom: tf,
+          timeTo: tt,
+          hours: r.hours || (needsTime(mode) ? calcDuration(tf, tt) : null),
 
-        reason: r.reason,
-        status: r.status,
-        appliedAt: r.applied_at,
+          reason: r.reason,
+          status: r.status,
+          appliedAt: r.applied_at,
 
-        decisionNote: r.decision_note || r.decisionNote || "",
-        decidedAt: r.decided_at || r.decidedAt || "",
-        decidedBy: r.decided_by_name || r.decidedBy || "",
-        sourceTable: ADMIN_LEAVES_TABLE, // ✅ Added source
-      };
-    });
+          decisionNote: r.decision_note || r.decisionNote || "",
+          decidedAt: r.decided_at || r.decidedAt || "",
+          decidedBy: r.decided_by_name || r.decidedBy || "",
+          sourceTable: ADMIN_LEAVES_TABLE, // ✅ Added source
+        };
+      });
 
     const merged = [...list1, ...list2].sort(
       (a, b) => new Date(b.appliedAt) - new Date(a.appliedAt)
@@ -444,8 +444,7 @@ export default function LeaveManagement() {
   };
 
   const summaryCardClass = (active) =>
-    `bg-white border rounded-xl p-3 text-left transition cursor-pointer hover:bg-gray-50 ${
-      active ? "ring-4 ring-purple-100 border-purple-300" : ""
+    `bg-white border rounded-xl p-3 text-left transition cursor-pointer hover:bg-gray-50 ${active ? "ring-4 ring-purple-100 border-purple-300" : ""
     }`;
 
   /* ---------------- APPLY ---------------- */
@@ -510,6 +509,20 @@ export default function LeaveManagement() {
     const { error } = await supabase.from(LEAVES_TABLE).insert(rowsToInsert);
     if (error) return alert(error.message);
 
+    // ✅ Notify the approver manager about the new leave request
+    try {
+      await notifyManagerNewRequest({
+        managerId: approverMgr.id,
+        managerName: approverMgr.name,
+        employeeName: currentHR.name,
+        leaveType: applyLeaveType,
+        fromDate: applyFrom,
+        toDate: needsTime(applyMode) ? applyFrom : applyTo,
+      });
+    } catch (notifErr) {
+      console.warn("Manager notification failed:", notifErr?.message || notifErr);
+    }
+
     setApplyLeaveType("Casual Leave");
     setApplyMode("Full Day");
     setApplyFrom("");
@@ -535,22 +548,20 @@ export default function LeaveManagement() {
             <button
               type="button"
               onClick={() => setViewMode("employee")}
-              className={`px-3 py-1.5 text-sm font-semibold rounded-lg ${
-                viewMode === "employee"
-                  ? "bg-purple-700 text-white shadow"
-                  : "text-gray-700 hover:bg-gray-50"
-              }`}
+              className={`px-3 py-1.5 text-sm font-semibold rounded-lg ${viewMode === "employee"
+                ? "bg-purple-700 text-white shadow"
+                : "text-gray-700 hover:bg-gray-50"
+                }`}
             >
               Employee
             </button>
             <button
               type="button"
               onClick={() => setViewMode("admin")}
-              className={`px-3 py-1.5 text-sm font-semibold rounded-lg ${
-                viewMode === "admin"
-                  ? "bg-purple-700 text-white shadow"
-                  : "text-gray-700 hover:bg-gray-50"
-              }`}
+              className={`px-3 py-1.5 text-sm font-semibold rounded-lg ${viewMode === "admin"
+                ? "bg-purple-700 text-white shadow"
+                : "text-gray-700 hover:bg-gray-50"
+                }`}
             >
               HR
             </button>
@@ -675,10 +686,10 @@ export default function LeaveManagement() {
               • Search: <b className="text-gray-900">{search.trim()}</b>
             </>
           ) : null}
-          </div>
         </div>
+      </div>
 
-        {/* Table */}
+      {/* Table */}
       <div
         id="leave-table"
         className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto"
@@ -741,8 +752,8 @@ export default function LeaveManagement() {
                           {r.ownerRole === "employee"
                             ? "Employee"
                             : r.ownerRole === "admin"
-                            ? "Admin"
-                            : "HR"}
+                              ? "Admin"
+                              : "HR"}
                         </span>
                         <span>{r.ownerId}</span>
                       </div>
@@ -922,9 +933,8 @@ export default function LeaveManagement() {
                     value={applyTo}
                     onChange={(e) => setApplyTo(e.target.value)}
                     disabled={needsTime(applyMode)}
-                    className={`w-full border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-400 ${
-                      needsTime(applyMode) ? "bg-slate-100 cursor-not-allowed" : ""
-                    }`}
+                    className={`w-full border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-400 ${needsTime(applyMode) ? "bg-slate-100 cursor-not-allowed" : ""
+                      }`}
                   />
                   {needsTime(applyMode) ? (
                     <div className="text-[11px] text-slate-500 mt-1">
@@ -1068,8 +1078,8 @@ export default function LeaveManagement() {
                       {viewing.ownerRole === "employee"
                         ? "Employee"
                         : viewing.ownerRole === "admin"
-                        ? "Admin"
-                        : "HR"}
+                          ? "Admin"
+                          : "HR"}
                     </span>
                     <span className="text-xs text-slate-500">{viewing.ownerId}</span>
                   </div>

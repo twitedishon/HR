@@ -30,27 +30,69 @@ export default function ManagerNotifications() {
     setLoading(true);
     setErrorMsg("");
 
-    const { data, error } = await supabase
-      .from(TABLE)
-      .select("id,title,detail,type,source,created_at")
-      .in("source", ALLOWED_SOURCES)
-      .in("audience", AUDIENCE)
-      .order("created_at", { ascending: false });
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id || null;
 
-    if (error) {
+      const [adminRes, personalRes] = await Promise.all([
+        supabase
+          .from(TABLE)
+          .select("id,title,detail,type,source,created_at")
+          .in("source", ALLOWED_SOURCES)
+          .in("audience", AUDIENCE)
+          .order("created_at", { ascending: false }),
+        userId
+          ? supabase
+              .from("employee_notifications")
+              .select("id,title,message,type,route,unread,created_at")
+              .eq("user_id", userId)
+              .order("created_at", { ascending: false })
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+
+      const adminData = adminRes?.data || [];
+      const adminError = adminRes?.error;
+      const personalData = personalRes?.data || [];
+      const personalError = personalRes?.error;
+
+      if (adminError) console.error("Manager notifications (admin table) error:", adminError);
+      if (personalError) console.error("Manager notifications (employee table) error:", personalError);
+
+      if (adminError && personalError) {
+        setAlerts([]);
+        setErrorMsg(adminError?.message || personalError?.message || "Failed to load notifications");
+      } else {
+        const mapped = [
+          ...adminData.map((n) => ({
+            id: `g-${n.id}`,
+            title: n.title || n.source || "Notification",
+            detail: n.detail || "",
+            timeLabel: formatTimeLabel(n.created_at),
+            created_at: n.created_at,
+            source: n.source || "-",
+            type: n.type || "info",
+          })),
+          ...personalData.map((n) => ({
+            id: `p-${n.id}`,
+            title: n.title || "Notification",
+            detail: n.message || "",
+            timeLabel: formatTimeLabel(n.created_at),
+            created_at: n.created_at,
+            source: "LeaveManagement",
+            type: n.type || "info",
+          })),
+        ].sort(
+          (a, b) =>
+            new Date(b.created_at || 0).getTime() -
+            new Date(a.created_at || 0).getTime()
+        );
+
+        setAlerts(mapped);
+      }
+    } catch (error) {
       console.error("Notifications fetch error:", error);
       setAlerts([]);
       setErrorMsg(error.message || "Failed to load notifications");
-    } else {
-      const mapped = (data || []).map((n) => ({
-        id: n.id,
-        title: n.title || n.source || "Notification",
-        detail: n.detail || "",
-        timeLabel: formatTimeLabel(n.created_at),
-        source: n.source || "-",
-        type: n.type || "info",
-      }));
-      setAlerts(mapped);
     }
 
     setLoading(false);

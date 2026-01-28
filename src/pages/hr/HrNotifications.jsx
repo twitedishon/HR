@@ -325,29 +325,63 @@ export default function HrNotifications() {
   const fetchNotifications = async () => {
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from(TABLE)
-      .select("id,title,detail,type,source,route,unread,created_at")
-      .in("source", ALLOWED_SOURCES)
-      .in("audience", AUDIENCE)
-      .order("created_at", { ascending: false });
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id || null;
 
-    if (error) {
+      const [adminRes, personalRes] = await Promise.all([
+        supabase
+          .from(TABLE)
+          .select("id,title,detail,type,source,route,unread,created_at")
+          .in("source", ALLOWED_SOURCES)
+          .in("audience", AUDIENCE)
+          .order("created_at", { ascending: false }),
+        userId
+          ? supabase
+              .from("employee_notifications")
+              .select("id,title,message,type,route,unread,created_at")
+              .eq("user_id", userId)
+              .order("created_at", { ascending: false })
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+
+      const adminData = adminRes?.data || [];
+      const adminError = adminRes?.error;
+      const personalData = personalRes?.data || [];
+      const personalError = personalRes?.error;
+
+      if (adminError) console.error("Notifications fetch error (admin table):", adminError);
+      if (personalError) console.error("Notifications fetch error (employee table):", personalError);
+
+      const mapped = [
+        ...adminData.map((n) => ({
+          id: `g-${n.id}`,
+          title: n.title || "-",
+          detail: n.detail || "",
+          type: n.type || "info",
+          source: n.source || "-",
+          route: n.route || "",
+          unread: n.unread ?? true,
+          created_at: n.created_at,
+          timeLabel: formatTimeLabel(n.created_at),
+        })),
+        ...personalData.map((n) => ({
+          id: `p-${n.id}`,
+          title: n.title || "-",
+          detail: n.message || "",
+          type: n.type || "info",
+          source: "LeaveManagement",
+          route: n.route || "/hr-dashboard/leave-management",
+          unread: n.unread ?? true,
+          created_at: n.created_at,
+          timeLabel: formatTimeLabel(n.created_at),
+        })),
+      ].sort((a, b) => (new Date(b.created_at) - new Date(a.created_at)));
+
+      setItems(mapped);
+    } catch (error) {
       console.error("Notifications fetch error:", error);
       setItems([]);
-    } else {
-      const mapped = (data || []).map((n) => ({
-        id: n.id,
-        title: n.title || "-",
-        detail: n.detail || "",
-        type: n.type || "info",
-        source: n.source || "-",
-        route: n.route || "",
-        unread: n.unread ?? true,
-        created_at: n.created_at,
-        timeLabel: formatTimeLabel(n.created_at),
-      }));
-      setItems(mapped);
     }
 
     setSelected(new Set());

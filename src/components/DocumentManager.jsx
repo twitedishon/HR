@@ -1046,11 +1046,11 @@ export default function DocumentManager({
         </div>
       )}
 
-      <p className="text-xs text-gray-400">
+      {/* <p className="text-xs text-gray-400">
         {offlineMode
           ? "Offline mode enabled. Documents are stored locally in this browser."
           : "Connected to Supabase (Storage + DB). Users will see only their own documents (RLS) + role-based access."}
-      </p>
+      </p> */}
 
       {noteModalOpen && selectedDoc && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setNoteModalOpen(false)}>

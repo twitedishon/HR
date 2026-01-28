@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Eye, Pencil, Plus, X, Check } from "lucide-react";
 import { supabase, isSupabaseConfigured } from "../../lib/supabaseClient";
+import { notifyManagerNewRequest } from "../../lib/notificationUtils";
 
 /* ---------------- CONSTANTS ---------------- */
 const LEAVES_TABLE = "hrmss_leave_requests";
@@ -52,9 +53,8 @@ const calcDuration = (from, to) => {
   if (diff <= 0) return "";
   const h = Math.floor(diff / 60);
   const m = diff % 60;
-  return `${h ? `${h} Hour${h > 1 ? "s" : ""}` : ""}${h && m ? " " : ""}${
-    m ? `${m} Minutes` : ""
-  }`;
+  return `${h ? `${h} Hour${h > 1 ? "s" : ""}` : ""}${h && m ? " " : ""}${m ? `${m} Minutes` : ""
+    }`;
 };
 
 /* ✅ DD-MM-YYYY format for display */
@@ -415,11 +415,10 @@ const MultiApproverSelect = ({ items, valueIds, setValueIds, errorText }) => {
                   </div>
 
                   <span
-                    className={`shrink-0 w-6 h-6 rounded-lg border flex items-center justify-center ${
-                      checked
-                        ? "bg-slate-900 border-slate-900 text-white"
-                        : "bg-white border-slate-200 text-transparent"
-                    }`}
+                    className={`shrink-0 w-6 h-6 rounded-lg border flex items-center justify-center ${checked
+                      ? "bg-slate-900 border-slate-900 text-white"
+                      : "bg-white border-slate-200 text-transparent"
+                      }`}
                   >
                     <Check size={14} />
                   </span>
@@ -439,9 +438,8 @@ function InfoCard({ label, value, multiline = false, big = false, children }) {
     <div className="rounded-2xl border bg-slate-50 p-3">
       <div className="text-[11px] text-slate-500">{label}</div>
       <div
-        className={`mt-1 font-semibold text-slate-900 ${
-          big ? "text-sm" : "text-base"
-        }`}
+        className={`mt-1 font-semibold text-slate-900 ${big ? "text-sm" : "text-base"
+          }`}
       >
         {children ? (
           children
@@ -466,9 +464,8 @@ function LeaveViewModal({ open, onClose, emp, data }) {
     .map((x) => x[0].toUpperCase())
     .join("");
 
-  const topLine = `${data.leaveType || ""} • ${data.mode || ""}${
-    data.timeFrom && data.timeTo ? ` • ${data.timeFrom} → ${data.timeTo}` : ""
-  }${data.hours ? ` • ${data.hours}` : ""}`;
+  const topLine = `${data.leaveType || ""} • ${data.mode || ""}${data.timeFrom && data.timeTo ? ` • ${data.timeFrom} → ${data.timeTo}` : ""
+    }${data.hours ? ` • ${data.hours}` : ""}`;
 
   return (
     <div
@@ -497,9 +494,8 @@ function LeaveViewModal({ open, onClose, emp, data }) {
               #{String(data.id).slice(0, 8)}
             </div>
             <span
-              className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
-                tone[data.status]
-              }`}
+              className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${tone[data.status]
+                }`}
             >
               {data.status}
             </span>
@@ -533,11 +529,11 @@ function LeaveViewModal({ open, onClose, emp, data }) {
               value={
                 data.appliedAt
                   ? `${toDMY(String(data.appliedAt).slice(0, 10))}\n${new Date(
-                      data.appliedAt
-                    ).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}`
+                    data.appliedAt
+                  ).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}`
                   : "-"
               }
               multiline
@@ -549,9 +545,8 @@ function LeaveViewModal({ open, onClose, emp, data }) {
               label="Time"
               value={
                 data.timeFrom && data.timeTo
-                  ? `${data.timeFrom} → ${data.timeTo}${
-                      data.hours ? ` • ${data.hours}` : ""
-                    }`
+                  ? `${data.timeFrom} → ${data.timeTo}${data.hours ? ` • ${data.hours}` : ""
+                  }`
                   : "-"
               }
             />
@@ -615,14 +610,13 @@ function LeaveEditModal({
   const durationText = needsTime(mode)
     ? calcDuration(shortTime(fromTime), shortTime(toTime)) || "-"
     : from && to
-    ? `${toDMY(from)} → ${toDMY(to)}`
-    : "-";
+      ? `${toDMY(from)} → ${toDMY(to)}`
+      : "-";
 
-  const topLine = `${type || ""} • ${mode || ""}${
-    needsTime(mode) && fromTime && toTime
-      ? ` • ${shortTime(fromTime)} → ${shortTime(toTime)}`
-      : ""
-  }${needsTime(mode) ? ` • ${durationText !== "-" ? durationText : ""}` : ""}`;
+  const topLine = `${type || ""} • ${mode || ""}${needsTime(mode) && fromTime && toTime
+    ? ` • ${shortTime(fromTime)} → ${shortTime(toTime)}`
+    : ""
+    }${needsTime(mode) ? ` • ${durationText !== "-" ? durationText : ""}` : ""}`;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -679,9 +673,8 @@ function LeaveEditModal({
               #{String(data.id).slice(0, 8)}
             </div>
             <span
-              className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
-                tone[data.status]
-              }`}
+              className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${tone[data.status]
+                }`}
             >
               {data.status}
             </span>
@@ -776,11 +769,10 @@ function LeaveEditModal({
                   value={to}
                   onChange={(e) => setTo(e.target.value)}
                   disabled={needsTime(mode)}
-                  className={`w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none ${
-                    needsTime(mode)
-                      ? "bg-slate-100 cursor-not-allowed"
-                      : "bg-white"
-                  }`}
+                  className={`w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none ${needsTime(mode)
+                    ? "bg-slate-100 cursor-not-allowed"
+                    : "bg-white"
+                    }`}
                 />
               </InfoCard>
             </div>
@@ -1052,11 +1044,11 @@ export default function EmployeeLeaveManagement() {
 
     const cached = readProfileFromCache(EMP.id);
     if (cached.status || cached.joinDate) {
-    setEmpProfile((p) => ({
-      status: cached.status || p.status,
-      joinDate: cached.joinDate || p.joinDate,
-      employeeType: cached.employeeType || p.employeeType,
-    }));
+      setEmpProfile((p) => ({
+        status: cached.status || p.status,
+        joinDate: cached.joinDate || p.joinDate,
+        employeeType: cached.employeeType || p.employeeType,
+      }));
     }
 
     let active = true;
@@ -1064,7 +1056,7 @@ export default function EmployeeLeaveManagement() {
       if (!isSupabaseConfigured) return;
       const { data, error } = await supabase
         .from("hrmss_employees")
-    .select("status, join_date, employee_type")
+        .select("status, join_date, employee_type")
         .eq("employee_id", EMP.id)
         .maybeSingle();
       if (error) return;
@@ -1111,7 +1103,7 @@ export default function EmployeeLeaveManagement() {
     const raw = empProfile.status || "";
     const provisional =
       String(raw).toLowerCase() === "probation" &&
-      isProbationComplete(empProfile.joinDate)
+        isProbationComplete(empProfile.joinDate)
         ? "Permanent"
         : raw;
     return provisional;
@@ -1230,9 +1222,8 @@ export default function EmployeeLeaveManagement() {
     try {
       const notifRows = rowsToInsert.map((row) => ({
         title: "New Leave Request",
-        detail: `${EMP.name} submitted a ${row.leave_type} (${row.mode}) request for ${row.from_date}${
-          row.to_date ? ` to ${row.to_date}` : ""
-        }.`,
+        detail: `${EMP.name} submitted a ${row.leave_type} (${row.mode}) request for ${row.from_date}${row.to_date ? ` to ${row.to_date}` : ""
+          }.`,
         type: "info",
         source: "LeaveManagement",
         route: "/dashboard/leave",
@@ -1244,6 +1235,25 @@ export default function EmployeeLeaveManagement() {
     } catch (notifErr) {
       console.warn("Admin notification insert failed:", notifErr?.message || notifErr);
       // Do not block the user flow on notification errors
+    }
+
+    // ✅ Notify managers about the new leave request
+    try {
+      for (const row of rowsToInsert) {
+        const approver = approverById.get(row.request_to_id);
+        if (approver && (approver.role === "manager" || approver.role === "hr")) {
+          await notifyManagerNewRequest({
+            managerId: approver.id,
+            managerName: approver.name,
+            employeeName: EMP.name,
+            leaveType: row.leave_type,
+            fromDate: row.from_date,
+            toDate: row.to_date,
+          });
+        }
+      }
+    } catch (mgrNotifErr) {
+      console.warn("Manager notification failed:", mgrNotifErr?.message || mgrNotifErr);
     }
 
     setCreateOpen(false);
@@ -1335,11 +1345,10 @@ export default function EmployeeLeaveManagement() {
             <button
               key={k}
               onClick={() => setStatusFilter(k)}
-              className={`px-3 py-1 rounded-full border ${
-                statusFilter === k
-                  ? "bg-white text-slate-800"
-                  : "bg-white/10 text-white"
-              }`}
+              className={`px-3 py-1 rounded-full border ${statusFilter === k
+                ? "bg-white text-slate-800"
+                : "bg-white/10 text-white"
+                }`}
               type="button"
             >
               {k}: {stats[k]}
@@ -1389,9 +1398,9 @@ export default function EmployeeLeaveManagement() {
                 <tr key={r.id}>
                   <td className="px-4 py-3">
                     {r.ownerId !== EMP.id && (
-                       <div className="text-xs font-bold text-indigo-600 mb-0.5">
-                          {r.ownerName} ({r.ownerId})
-                       </div>
+                      <div className="text-xs font-bold text-indigo-600 mb-0.5">
+                        {r.ownerName} ({r.ownerId})
+                      </div>
                     )}
                     <div className="font-semibold">{r.leaveType}</div>
                     <div className="text-xs text-slate-500">
@@ -1426,9 +1435,8 @@ export default function EmployeeLeaveManagement() {
 
                   <td className="px-4 py-3">
                     <span
-                      className={`px-2 py-1 rounded-full border text-xs ${
-                        tone[r.status]
-                      }`}
+                      className={`px-2 py-1 rounded-full border text-xs ${tone[r.status]
+                        }`}
                     >
                       {r.status}
                     </span>
@@ -1560,9 +1568,8 @@ export default function EmployeeLeaveManagement() {
                 onChange={(e) => setCTo(e.target.value)}
                 disabled={needsTime(cMode)}
                 required
-                className={`w-full border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 ${
-                  needsTime(cMode) ? "bg-slate-100 cursor-not-allowed" : ""
-                }`}
+                className={`w-full border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 ${needsTime(cMode) ? "bg-slate-100 cursor-not-allowed" : ""
+                  }`}
               />
             </div>
           </div>

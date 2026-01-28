@@ -14,7 +14,7 @@ export const notifyEmployee = async ({
   if (!ownerId) return;
 
   try {
-    // ✅ First try to get auth_user_id from hrmss_approvers directly
+    // Primary: try to resolve auth_user_id from approvers
     let { data: approver } = await supabase
       .from("hrmss_approvers")
       .select("auth_user_id")
@@ -22,40 +22,33 @@ export const notifyEmployee = async ({
       .maybeSingle();
 
     let userIdToNotify = approver?.auth_user_id;
-    console.log(
-      "Looking up notification user for ownerId:",
-      ownerId,
-      "found auth_user_id:",
-      userIdToNotify
-    );
 
-    // If not found in approvers, look up by user_id in hrmss_profiles to get email
+    // Secondary: resolve via hrmss_profiles (email -> approvers)
+    let profile;
     if (!userIdToNotify) {
-      const { data: profile } = await supabase
+      const profileRes = await supabase
         .from("hrmss_profiles")
         .select("email, user_id")
         .eq("user_id", ownerId)
         .maybeSingle();
+      profile = profileRes?.data;
 
       if (profile?.email) {
-        console.log(
-          "Found profile email:",
-          profile.email,
-          "looking for auth_user_id..."
-        );
-        // Try to find auth_user_id by matching email in hrmss_approvers
         const { data: approverByEmail } = await supabase
           .from("hrmss_approvers")
           .select("auth_user_id")
           .eq("email", profile.email)
           .maybeSingle();
-
         userIdToNotify = approverByEmail?.auth_user_id;
-        console.log(
-          "Found auth_user_id from approvers by email:",
-          userIdToNotify
-        );
       }
+    }
+
+    // Final fallback: use profile.user_id or the ownerId itself
+    if (!userIdToNotify && profile?.user_id) {
+      userIdToNotify = profile.user_id;
+    }
+    if (!userIdToNotify && ownerId) {
+      userIdToNotify = ownerId;
     }
 
     if (!userIdToNotify) {
@@ -69,9 +62,10 @@ export const notifyEmployee = async ({
       status === "Approved"
         ? `Your ${leaveType} request was approved.`
         : status === "Rejected"
-        ? `Your ${leaveType} request was rejected.`
-        : `Your ${leaveType} request was updated.`;
+          ? `Your ${leaveType} request was rejected.`
+          : `Your ${leaveType} request was updated.`;
 
+    // ✅ Insert to employee_notifications table
     const notificationData = {
       user_id: userIdToNotify,
       title: "Leave Request Update",
@@ -80,13 +74,11 @@ export const notifyEmployee = async ({
         status === "Approved"
           ? "success"
           : status === "Rejected"
-          ? "error"
-          : "info",
+            ? "error"
+            : "info",
       route: "/employee-dashboard/leave-management",
       unread: true,
     };
-
-    console.log("Inserting employee notification:", notificationData);
 
     const { error: notifError } = await supabase
       .from(EMP_NOTIF_TABLE)
@@ -97,6 +89,19 @@ export const notifyEmployee = async ({
     } else {
       console.log("Employee notification sent successfully");
     }
+
+    // ✅ Also insert to hrmss_notifications for admin/approver users
+    const adminNotificationData = {
+      title: `Leave Request ${status}`,
+      detail: message,
+      type: status === "Approved" ? "success" : status === "Rejected" ? "warning" : "info",
+      source: "LeaveManagement",
+      route: "/dashboard/leave",
+      audience: "admin",
+      unread: true,
+    };
+
+    await supabase.from(ADMIN_NOTIF_TABLE).insert(adminNotificationData);
   } catch (error) {
     console.error("Error notifying employee:", error);
   }
@@ -116,7 +121,7 @@ export const notifyManagerNewRequest = async ({
   if (!managerId) return;
 
   try {
-    // ✅ First try to get auth_user_id from hrmss_approvers
+    // Validate the manager exists (used to avoid noise)
     let { data: manager } = await supabase
       .from("hrmss_approvers")
       .select("id, auth_user_id, email, name")
@@ -125,7 +130,6 @@ export const notifyManagerNewRequest = async ({
 
     let userIdToNotify = manager?.auth_user_id;
 
-    // ✅ If no auth_user_id in approvers, try to find it via email in hrmss_profiles
     if (!userIdToNotify && manager?.email) {
       const { data: profileData } = await supabase
         .from("hrmss_profiles")
@@ -140,32 +144,24 @@ export const notifyManagerNewRequest = async ({
         `Cannot find user_id for manager ${managerId} (${managerName}). Manager data:`,
         manager
       );
-      return;
     }
 
     const dateRange =
       fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`;
     const message = `HR sent a ${leaveType} request for ${employeeName} (${dateRange}) for your approval.`;
 
-    console.log("Inserting notification for manager:", {
-      user_id: userIdToNotify,
-      managerName,
-      message,
-    });
-
     const notificationData = {
-      user_id: userIdToNotify,
       title: "New Leave Request for Approval",
-      message,
+      detail: message,
       type: "info",
-      route: "/manager-approver/approvals",
+      source: "LeaveManagement",
+      route: "/manager-approver-dashboard/approvals",
+      audience: "manager",
       unread: true,
     };
 
-    console.log("Manager notification data:", notificationData);
-
     const { error: notifError } = await supabase
-      .from(EMP_NOTIF_TABLE)
+      .from(ADMIN_NOTIF_TABLE)
       .insert(notificationData);
 
     if (notifError) {
@@ -194,51 +190,6 @@ export const notifyHRAboutDecision = async ({
   if (!managerName || !status) return;
 
   try {
-    // ✅ Get HR users from hrmss_profiles (they are HR role users)
-    const { data: hrProfiles } = await supabase
-      .from("hrmss_profiles")
-      .select("user_id, email, role")
-      .eq("role", "hr");
-
-    if (!hrProfiles || hrProfiles.length === 0) {
-      console.warn("No HR users found in hrmss_profiles");
-      return;
-    }
-
-    console.log("Found HR users in profiles:", hrProfiles.length);
-
-    // For each HR user, try to find their auth_user_id from hrmss_approvers by email
-    const validHRUsers = [];
-    for (const hrProfile of hrProfiles) {
-      if (hrProfile.email) {
-        const { data: approverData } = await supabase
-          .from("hrmss_approvers")
-          .select("auth_user_id, id, email")
-          .eq("email", hrProfile.email)
-          .maybeSingle();
-
-        if (approverData?.auth_user_id) {
-          console.log(
-            "Found auth_user_id for HR",
-            hrProfile.email,
-            ":",
-            approverData.auth_user_id
-          );
-          validHRUsers.push({
-            auth_user_id: approverData.auth_user_id,
-            email: hrProfile.email,
-          });
-        } else {
-          console.log("No auth_user_id found for HR", hrProfile.email);
-        }
-      }
-    }
-
-    if (validHRUsers.length === 0) {
-      console.warn("No HR users with valid auth_user_ids found");
-      return;
-    }
-
     const dateRange =
       fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`;
     const statusText = status === "Approved" ? "approved" : "rejected";
@@ -247,31 +198,25 @@ export const notifyHRAboutDecision = async ({
       message += ` Note: ${decisionNote}`;
     }
 
-    // Send notification to each HR user via employee_notifications
-    for (const hr of validHRUsers) {
-      const notificationData = {
-        user_id: hr.auth_user_id,
-        title: `Leave Request ${status}`,
-        message,
-        type: status === "Approved" ? "success" : "warning",
-        route: "/hr-dashboard/leave-management",
-        unread: true,
-      };
+    const notificationData = {
+      title: `Leave Request ${status}`,
+      detail: message,
+      type: status === "Approved" ? "success" : "warning",
+      source: "LeaveManagement",
+      route: "/hr-dashboard/leave",
+      audience: "hr",
+      unread: true,
+    };
 
-      console.log("HR notification data:", notificationData);
+    const { error: notifError } = await supabase
+      .from(ADMIN_NOTIF_TABLE)
+      .insert(notificationData);
 
-      const { error: notifError } = await supabase
-        .from(EMP_NOTIF_TABLE)
-        .insert(notificationData);
-
-      if (notifError) {
-        console.error("HR notification insert error:", notifError);
-      }
+    if (notifError) {
+      console.error("HR notification insert error:", notifError);
+    } else {
+      console.log("Inserted HR notification into hrmss_notifications successfully");
     }
-
-    console.log(
-      `Notified ${validHRUsers.length} HR user(s) about leave request ${status}`
-    );
   } catch (error) {
     console.error("Error notifying HR:", error);
   }

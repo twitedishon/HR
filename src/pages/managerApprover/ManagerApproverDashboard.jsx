@@ -1,5 +1,6 @@
 // src/pages/managerApprover/ManagerApproverDashboard.jsx
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   CalendarClock,
 
@@ -560,6 +561,9 @@ export default function ManagerDashboard() {
     return employees;
   }, [employees]);
 
+  // IDs to exclude from the dashboard
+  const EXCLUDED_IDS = ["HR-PRIYA", "MGR-SUNIL"];
+
   const roleCounts = useMemo(() => {
     const counts = { employee: 0, manager: 0, hr: 0 };
     const detect = (e) => {
@@ -570,6 +574,8 @@ export default function ManagerDashboard() {
       return "employee";
     };
     filteredEmployees.forEach((e) => {
+      // Skip excluded IDs
+      if (EXCLUDED_IDS.includes(e.id)) return;
       const k = detect(e);
       counts[k] = (counts[k] || 0) + 1;
     });
@@ -589,9 +595,13 @@ export default function ManagerDashboard() {
 
   }, [filteredEmployees]);
 
+
+
   const employeesList = useMemo(() => {
     const q = employeeQuery.trim().toLowerCase();
     return filteredEmployees.filter((emp) => {
+      // Exclude specific IDs
+      if (EXCLUDED_IDS.includes(emp.id)) return false;
       // category filter
       const roleTextFull = `${emp.roleRaw || ""} ${safeObj(emp.job).title || ""}`.toLowerCase();
       if (employeeCategory === "manager" && !roleTextFull.includes("manager")) return false;
@@ -777,6 +787,16 @@ export default function ManagerDashboard() {
           )}
         </div>
 
+        {/* Go to Leave Management Button */}
+        <div className="flex justify-end">
+          <Link
+            to="/manager-approver-dashboard/approvals"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition"
+          >
+            <FileText size={16} />
+            Go to Leave Management
+          </Link>
+        </div>
       </div>
     );
   };
