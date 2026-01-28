@@ -188,16 +188,16 @@ const resolveEffectiveRole = ({ roleProp, authCache } = {}) => {
 const resolveEmployeeId = ({ authCache, legacyEmployeeSignin } = {}) => {
   const empId = String(
     authCache?.employee_id ||
-      authCache?.employeeId ||
-      authCache?.empId ||
-      authCache?.identifier ||
-      authCache?.id ||
-      legacyEmployeeSignin?.employee_id ||
-      legacyEmployeeSignin?.employeeId ||
-      legacyEmployeeSignin?.empId ||
-      legacyEmployeeSignin?.identifier ||
-      legacyEmployeeSignin?.id ||
-      ""
+    authCache?.employeeId ||
+    authCache?.empId ||
+    authCache?.identifier ||
+    authCache?.id ||
+    legacyEmployeeSignin?.employee_id ||
+    legacyEmployeeSignin?.employeeId ||
+    legacyEmployeeSignin?.empId ||
+    legacyEmployeeSignin?.identifier ||
+    legacyEmployeeSignin?.id ||
+    ""
   ).trim();
   return empId || "";
 };
@@ -205,12 +205,12 @@ const resolveEmployeeId = ({ authCache, legacyEmployeeSignin } = {}) => {
 const resolvePreferredEmail = ({ authCache, legacyEmployeeSignin } = {}) => {
   const email = String(
     authCache?.officialEmail ||
-      authCache?.official_email ||
-      authCache?.email ||
-      legacyEmployeeSignin?.officialEmail ||
-      legacyEmployeeSignin?.official_email ||
-      legacyEmployeeSignin?.email ||
-      ""
+    authCache?.official_email ||
+    authCache?.email ||
+    legacyEmployeeSignin?.officialEmail ||
+    legacyEmployeeSignin?.official_email ||
+    legacyEmployeeSignin?.email ||
+    ""
   ).trim();
   return email || undefined;
 };
@@ -301,7 +301,7 @@ export default function DocumentManager({
   const writeOfflineDocs = (rows) => {
     try {
       localStorage.setItem(getOfflineStorageKey(), JSON.stringify(rows || []));
-    } catch {}
+    } catch { }
   };
 
   const resetUploadForm = () => {
@@ -369,15 +369,15 @@ export default function DocumentManager({
       effectiveRole === "employee"
         ? resolveEmployeeId({ authCache, legacyEmployeeSignin }) || String(docsAuth?.identifier || docsAuth?.email || "").trim()
         : String(
-            authCache?.user_id ||
-              authCache?.userId ||
-              authCache?.id ||
-              authCache?.identifier ||
-              authCache?.email ||
-              docsAuth?.identifier ||
-              docsAuth?.email ||
-              ""
-          ).trim();
+          authCache?.user_id ||
+          authCache?.userId ||
+          authCache?.id ||
+          authCache?.identifier ||
+          authCache?.email ||
+          docsAuth?.identifier ||
+          docsAuth?.email ||
+          ""
+        ).trim();
 
     if (!identifier) return null;
 
@@ -449,7 +449,14 @@ export default function DocumentManager({
         q = q.eq("role", "employee");
         if (statusFilter !== "all") q = q.eq("status", statusFilter);
       } else {
-        q = q.eq("user_id", authed.id);
+        // For employees, use employee_id instead of auth user.id
+        // because all employees share the same bridged auth session
+        const authCache = readAuthCache();
+        const legacyEmployeeSignin = readLegacyEmployeeSignin();
+        const empId = resolveEmployeeId({ authCache, legacyEmployeeSignin });
+
+        const queryUserId = (normalizedPageRole === "employee" && empId) ? empId : authed.id;
+        q = q.eq("user_id", queryUserId);
         if (normalizedPageRole) q = q.eq("role", normalizedPageRole);
       }
 
@@ -529,7 +536,7 @@ export default function DocumentManager({
     return () => {
       try {
         authSub?.unsubscribe();
-      } catch {}
+      } catch { }
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -588,7 +595,14 @@ export default function DocumentManager({
 
       must(normalizedPageRole, "Role missing/invalid. Cannot upload without role.");
 
-      const userId = user.id;
+      // For employees, use employee_id as user_id so each employee has unique documents
+      const authCache = readAuthCache();
+      const legacyEmployeeSignin = readLegacyEmployeeSignin();
+      const empId = resolveEmployeeId({ authCache, legacyEmployeeSignin });
+
+      const isEmployee = normalizedPageRole === "employee";
+      const userId = (isEmployee && empId) ? empId : user.id;
+
       const fileName = safeFileName(file.name);
       const stamp = Date.now();
       const storagePath = `${userId}/${stamp}_${fileName}`;
@@ -600,7 +614,6 @@ export default function DocumentManager({
       });
       if (upErr) throw upErr;
 
-      const isEmployee = normalizedPageRole === "employee";
       const payload = {
         user_id: userId,
         role: normalizedPageRole,
@@ -864,9 +877,8 @@ export default function DocumentManager({
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 rounded-full border text-xs font-semibold ${
-                statusFilter === s ? `${theme.solid} ${theme.hover}` : "bg-white hover:bg-gray-50"
-              }`}
+              className={`px-3 py-1.5 rounded-full border text-xs font-semibold ${statusFilter === s ? `${theme.solid} ${theme.hover}` : "bg-white hover:bg-gray-50"
+                }`}
             >
               {s.charAt(0).toUpperCase() + s.slice(1)}
             </button>
@@ -885,9 +897,8 @@ export default function DocumentManager({
         <div className="bg-white rounded-2xl border shadow-sm p-5">
           <div
             onClick={() => canUpload && fileRef.current?.click()}
-            className={`border-2 border-dashed rounded-xl p-5 text-center transition ${theme.border} ${
-              canUpload ? "cursor-pointer" : "opacity-60 cursor-not-allowed"
-            }`}
+            className={`border-2 border-dashed rounded-xl p-5 text-center transition ${theme.border} ${canUpload ? "cursor-pointer" : "opacity-60 cursor-not-allowed"
+              }`}
           >
             <UploadCloud className={`mx-auto ${theme.subtle}`} />
             <p className="font-semibold mt-2">Click to upload document</p>
@@ -1086,11 +1097,10 @@ export default function DocumentManager({
               </button>
               <button
                 onClick={() => updateStatus(selectedDoc.id, selectedAction, noteText)}
-                className={`px-3 py-1.5 text-xs rounded-lg border font-semibold ${
-                  selectedAction === "approved"
-                    ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                    : "bg-rose-50 text-rose-700 hover:bg-rose-100"
-                }`}
+                className={`px-3 py-1.5 text-xs rounded-lg border font-semibold ${selectedAction === "approved"
+                  ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                  : "bg-rose-50 text-rose-700 hover:bg-rose-100"
+                  }`}
                 type="button"
                 disabled={busy}
               >
