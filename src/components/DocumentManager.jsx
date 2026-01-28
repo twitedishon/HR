@@ -407,11 +407,37 @@ export default function DocumentManager({
   };
 
   const getAuthedUser = async () => {
-    const user = await ensureDocsAuthSession();
-    if (user?.id) return user;
-    const { data, error } = await supabase.auth.getSession();
-    if (error) throw error;
-    return data?.session?.user || null;
+    // First check for existing Supabase session
+    const { data: existingSession } = await supabase.auth.getSession();
+    if (existingSession?.session?.user?.id) {
+      return existingSession.session.user;
+    }
+
+    // Instead of calling auth bridge (which causes rate limiting),
+    // create a virtual user from localStorage auth data
+    const authCache = readAuthCache();
+    const legacyEmployeeSignin = readLegacyEmployeeSignin();
+    const effectiveRole = resolveEffectiveRole({ roleProp: role, authCache });
+
+    // Build a virtual user ID from localStorage
+    const virtualUserId =
+      resolveEmployeeId({ authCache, legacyEmployeeSignin }) ||
+      authCache?.user_id ||
+      authCache?.userId ||
+      authCache?.id ||
+      authCache?.identifier ||
+      authCache?.email;
+
+    if (virtualUserId) {
+      console.log("DocumentManager: Using virtual user for", effectiveRole, ":", virtualUserId);
+      return {
+        id: virtualUserId,
+        email: authCache?.email || authCache?.official_email || legacyEmployeeSignin?.email
+      };
+    }
+
+    // Final fallback - return null (will trigger offline mode or error)
+    return null;
   };
 
   /* ---------- LOAD DOCS ---------- */
