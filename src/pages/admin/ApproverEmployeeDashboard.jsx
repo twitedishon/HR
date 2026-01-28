@@ -4,8 +4,6 @@ import {
   Users,
   CalendarDays,
   ClipboardList,
-  Wallet,
-  Clock3,
   ArrowRight,
   X,
 } from "lucide-react";
@@ -110,9 +108,8 @@ const AdminDashboard = () => {
   const [totalEmployees, setTotalEmployees] = useState(0);
   const [pendingLeaveRequests, setPendingLeaveRequests] = useState(0);
 
-  // (optional) keep existing UI for present + payroll; you can wire later
+  // (optional) keep existing UI for present; you can wire later
   const [presentToday, setPresentToday] = useState(0);
-  const [payrollPending, setPayrollPending] = useState(0);
 
 
   const [dataError, setDataError] = useState("");
@@ -239,8 +236,8 @@ const AdminDashboard = () => {
         reqToRole === "hr"
           ? "Waiting for HR"
           : reqToRole === "manager"
-          ? "Waiting for Manager"
-          : "Pending";
+            ? "Waiting for Manager"
+            : "Pending";
 
       return {
         reqId: safeStr(pick(r, ["req_id", "request_id", "id"], "")),
@@ -285,9 +282,6 @@ const AdminDashboard = () => {
   // ✅ demo present list (keep as-is). You can wire attendance later.
   const presentList = useMemo(() => [], []);
 
-  // ✅ payroll pending list (keep as-is). You can wire payroll later.
-  const payrollPendingList = useMemo(() => [], []);
-
   const attendanceSummary = useMemo(
     () => [
       { label: "Present", value: presentToday, color: "bg-sky-500" },
@@ -312,29 +306,22 @@ const AdminDashboard = () => {
       totalEmployees <= 5
         ? "from-slate-800 to-slate-700"
         : totalEmployees <= 20
-        ? "from-slate-900 to-slate-800"
-        : "from-slate-950 to-slate-900",
+          ? "from-slate-900 to-slate-800"
+          : "from-slate-950 to-slate-900",
 
     present:
       presentPercentage < 50
         ? "from-blue-800 to-blue-700"
         : presentPercentage < 80
-        ? "from-blue-900 to-blue-800"
-        : "from-slate-900 to-blue-900",
+          ? "from-blue-900 to-blue-800"
+          : "from-slate-900 to-blue-900",
 
     leave:
       pendingLeaveRequests <= 1
         ? "from-slate-700 to-slate-600"
         : pendingLeaveRequests <= 4
-        ? "from-slate-800 to-slate-700"
-        : "from-slate-900 to-slate-800",
-
-    payroll:
-      payrollPending <= 1
-        ? "from-slate-800 to-slate-700"
-        : payrollPending <= 3
-        ? "from-slate-900 to-slate-800"
-        : "from-slate-950 to-slate-900",
+          ? "from-slate-800 to-slate-700"
+          : "from-slate-900 to-slate-800",
   };
 
   const statCards = [
@@ -362,14 +349,6 @@ const AdminDashboard = () => {
       gradient: cardGradients.leave,
       icon: ClipboardList,
     },
-    {
-      id: "payroll",
-      title: "Payroll Pending",
-      value: payrollPending,
-      subtitle: "This month",
-      gradient: cardGradients.payroll,
-      icon: Wallet,
-    },
   ];
 
   // ✅ small view modal (for ALL clicks)
@@ -394,9 +373,6 @@ const AdminDashboard = () => {
 
     if (cardId === "leave")
       return openView(`Pending Leave (${pendingLeaveRequests})`, "leaves", leaveRequestsList);
-
-    if (cardId === "payroll")
-      return openView(`Payroll Pending (${payrollPending})`, "people", payrollPendingList);
   };
 
   return (
@@ -549,55 +525,6 @@ const AdminDashboard = () => {
         </div>
 
         <div className="space-y-5">
-          {/* Recent Notifications */}
-          <div
-            className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-slate-100 cursor-pointer"
-            onClick={() => openView("Recent Notifications", "notifications", notifications)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === "Enter" && openView("Recent Notifications", "notifications", notifications)}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">
-                Recent Notifications
-              </h2>
-              <button
-                type="button"
-                className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openView("Recent Notifications", "notifications", notifications);
-                }}
-              >
-                View all
-              </button>
-            </div>
-
-            <div className="space-y-2 text-sm">
-
-              {notifications.map((note) => (
-                <button
-                  key={note.id}
-                  type="button"
-                  className="w-full text-left rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-100 hover:bg-indigo-50 hover:ring-indigo-200 transition"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openView(`Notification • ${note.type}`, "notifications", [note]);
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-700">
-                      {note.type}
-                    </span>
-                    <span className="text-[11px] text-slate-400 inline-flex items-center gap-1">
-                      <Clock3 size={12} /> {note.time}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-600">{note.text}</p>
-                </button>
-              ))}
-            </div>
-          </div>
 
           {/* Quick Actions */}
           <div className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-slate-100">
