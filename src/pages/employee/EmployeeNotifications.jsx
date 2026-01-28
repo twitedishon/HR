@@ -20,21 +20,63 @@ export default function EmployeeNotifications() {
       setErr("");
       setLoading(true);
 
+      let authUserId = null;
+      let employeeId = null;
+
+      // Strategy 1: Try Supabase Auth (for HR, Admin, Manager roles)
       const { data: userData, error: userErr } = await supabase.auth.getUser();
-      if (userErr || !userData?.user?.id) {
+      if (!userErr && userData?.user?.id) {
+        authUserId = userData.user.id;
+      }
+
+      // Strategy 2: Try localStorage for employee_id (for Employee role)
+      try {
+        const authSession = localStorage.getItem("HRMSS_AUTH_SESSION");
+        if (authSession) {
+          const parsed = JSON.parse(authSession);
+          employeeId = parsed?.employee_id || parsed?.identifier || parsed?.empId || null;
+        }
+      } catch { }
+
+      // Strategy 3: Try legacy employee signin key
+      if (!employeeId) {
+        try {
+          const legacySession = localStorage.getItem("hrmss.employee.signin");
+          if (legacySession) {
+            const parsed = JSON.parse(legacySession);
+            employeeId = parsed?.employee_id || parsed?.identifier || parsed?.empId || null;
+          }
+        } catch { }
+      }
+
+      // Collect all possible user IDs to query
+      const userIds = [authUserId, employeeId].filter(Boolean);
+
+      if (userIds.length === 0) {
         setErr("Please sign in to view notifications.");
         setRows([]);
         setLoading(false);
         return;
       }
 
-      const { data, error } = await supabase
+      console.log("EmployeeNotifications: Fetching notifications for user_ids:", userIds);
+
+      // Query with .in() to match notifications by EITHER auth UUID OR employee_id
+      const response = await supabase
         .from(TABLE)
         .select("id,title,message,category,type,priority,route,unread,created_at")
-        .eq("user_id", userData.user.id)
+        .in("user_id", userIds)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      console.log("EmployeeNotifications: Raw Supabase response:", response);
+
+      if (response.error) {
+        console.error("EmployeeNotifications: Supabase error:", response.error);
+        throw response.error;
+      }
+
+      const data = response.data;
+      console.log("EmployeeNotifications: Found", data?.length || 0, "notifications, data:", data);
       setRows(data || []);
     } catch (e) {
       setErr(e?.message || "Failed to load notifications");

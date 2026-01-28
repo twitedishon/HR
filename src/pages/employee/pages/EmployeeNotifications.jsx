@@ -39,8 +39,8 @@ function MiniBadge({ tone = "neutral", children }) {
     tone === "warning"
       ? "bg-amber-50 text-amber-700 border-amber-200"
       : tone === "info"
-      ? "bg-blue-50 text-blue-700 border-blue-200"
-      : "bg-slate-50 text-slate-700 border-slate-200";
+        ? "bg-blue-50 text-blue-700 border-blue-200"
+        : "bg-slate-50 text-slate-700 border-slate-200";
 
   return (
     <span className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs ${cls}`}>
@@ -108,11 +108,11 @@ export default function EmployeeNotifications() {
     createdAt: n.created_at,
   });
 
-  const fetchNotifications = async (uid) => {
+  const fetchNotifications = async (userIds) => {
     const { data, error } = await supabase
       .from("employee_notifications")
       .select("id,title,message,category,type,priority,route,unread,created_at")
-      .eq("user_id", uid)
+      .in("user_id", userIds)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -125,14 +125,43 @@ export default function EmployeeNotifications() {
       setErrorMsg("");
 
       try {
+        let authUserId = null;
+        let employeeId = null;
+
+        // Strategy 1: Try Supabase Auth (for HR, Admin, Manager roles)
         const {
           data: { user },
           error: userErr,
         } = await supabase.auth.getUser();
 
-        if (userErr) throw userErr;
+        if (!userErr && user?.id) {
+          authUserId = user.id;
+        }
 
-        if (!user?.id) {
+        // Strategy 2: Try localStorage for employee_id (for Employee role)
+        try {
+          const authSession = localStorage.getItem("HRMSS_AUTH_SESSION");
+          if (authSession) {
+            const parsed = JSON.parse(authSession);
+            employeeId = parsed?.employee_id || parsed?.identifier || parsed?.empId || null;
+          }
+        } catch { }
+
+        // Strategy 3: Try legacy employee signin key
+        if (!employeeId) {
+          try {
+            const legacySession = localStorage.getItem("hrmss.employee.signin");
+            if (legacySession) {
+              const parsed = JSON.parse(legacySession);
+              employeeId = parsed?.employee_id || parsed?.identifier || parsed?.empId || null;
+            }
+          } catch { }
+        }
+
+        // Collect all possible user IDs
+        const userIds = [authUserId, employeeId].filter(Boolean);
+
+        if (userIds.length === 0) {
           setUserId(null);
           setList([]);
           setErrorMsg("Not logged in. Please sign in again.");
@@ -140,9 +169,9 @@ export default function EmployeeNotifications() {
           return;
         }
 
-        setUserId(user.id);
+        setUserId(userIds);
 
-        const rows = await fetchNotifications(user.id);
+        const rows = await fetchNotifications(userIds);
         setList(rows);
       } catch (e) {
         console.error("Notifications fetch failed:", e);
@@ -379,9 +408,8 @@ export default function EmployeeNotifications() {
 
             <button
               onClick={() => setShowFilters((v) => !v)}
-              className={`ml-2 inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm hover:bg-slate-50 ${
-                showFilters ? "border-blue-300" : "border-slate-200"
-              }`}
+              className={`ml-2 inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm hover:bg-slate-50 ${showFilters ? "border-blue-300" : "border-slate-200"
+                }`}
             >
               <SlidersHorizontal size={16} />
               Filters
@@ -395,9 +423,8 @@ export default function EmployeeNotifications() {
                   <div className="text-xs text-slate-500 mb-1">Unread</div>
                   <button
                     onClick={() => setUnreadOnly((v) => !v)}
-                    className={`w-full rounded-xl border px-3 py-2 text-sm text-left hover:bg-slate-50 ${
-                      unreadOnly ? "border-blue-300" : "border-slate-200"
-                    }`}
+                    className={`w-full rounded-xl border px-3 py-2 text-sm text-left hover:bg-slate-50 ${unreadOnly ? "border-blue-300" : "border-slate-200"
+                      }`}
                   >
                     {unreadOnly ? "Only unread" : "All"}
                   </button>
@@ -554,11 +581,10 @@ function Category({ icon: Icon, label, count, active, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm border transition ${
-        active
-          ? "bg-blue-50 border-blue-200 text-blue-800 font-semibold"
-          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-      }`}
+      className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm border transition ${active
+        ? "bg-blue-50 border-blue-200 text-blue-800 font-semibold"
+        : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+        }`}
     >
       <span className="flex items-center gap-2">
         <span className="h-9 w-9 rounded-2xl border bg-white grid place-items-center">
@@ -585,18 +611,17 @@ function NotificationCard({ data, onOpen, onDelete, disabled }) {
     data.type === "warning"
       ? "border-l-amber-400"
       : data.type === "action"
-      ? "border-l-blue-500"
-      : data.type === "announcement"
-      ? "border-l-violet-500"
-      : "border-l-emerald-400";
+        ? "border-l-blue-500"
+        : data.type === "announcement"
+          ? "border-l-violet-500"
+          : "border-l-emerald-400";
 
   const timeText = data.createdAt ? fmtTime(data.createdAt) : "";
 
   return (
     <div
-      className={`rounded-3xl border bg-white p-5 flex gap-4 transition hover:shadow-sm ${
-        data.unread ? `border-l-4 ${accent}` : ""
-      }`}
+      className={`rounded-3xl border bg-white p-5 flex gap-4 transition hover:shadow-sm ${data.unread ? `border-l-4 ${accent}` : ""
+        }`}
     >
       <div className="rounded-2xl bg-slate-50 border p-3 h-fit">
         <Icon size={20} className="text-slate-700" />

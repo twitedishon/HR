@@ -242,6 +242,7 @@ export default function ManagerApprovals() {
       await notifyEmployee({
         ownerId: requestRecord.ownerId,
         status: nextStatus,
+        leaveType: requestRecord.leaveType || "Leave Request",
       });
 
       // ✅ Notify HR about the manager's decision
@@ -285,12 +286,10 @@ export default function ManagerApprovals() {
           </span>
 
           <span
-            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full font-semibold ${
-
-              canAct
+            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full font-semibold ${canAct
                 ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                 : "bg-slate-100 text-slate-600"
-            }`}
+              }`}
           >
             Role: {canAct ? "Approver" : "View only"}
           </span>
@@ -345,9 +344,8 @@ export default function ManagerApprovals() {
                   </div>
 
                   <span
-                    className={`text-[11px] font-semibold px-2 py-1 rounded-full border ${
-                      statusTone[req.status]
-                    }`}
+                    className={`text-[11px] font-semibold px-2 py-1 rounded-full border ${statusTone[req.status]
+                      }`}
                   >
                     {req.status}
                   </span>
@@ -400,11 +398,10 @@ export default function ManagerApprovals() {
                   <button
                     disabled={!canAct || req.status !== "Pending"}
                     onClick={() => handleAction(req.id, "Approved")}
-                    className={`rounded-xl px-3 py-2 text-xs font-semibold border ${
-                      !canAct || req.status !== "Pending"
+                    className={`rounded-xl px-3 py-2 text-xs font-semibold border ${!canAct || req.status !== "Pending"
                         ? "bg-slate-100 text-slate-500 cursor-not-allowed"
                         : "bg-emerald-600 text-white hover:bg-emerald-700"
-                    }`}
+                      }`}
                   >
                     Approve
                   </button>
@@ -412,11 +409,10 @@ export default function ManagerApprovals() {
                   <button
                     disabled={!canAct || req.status !== "Pending"}
                     onClick={() => handleAction(req.id, "Rejected")}
-                    className={`rounded-xl px-3 py-2 text-xs font-semibold border ${
-                      !canAct || req.status !== "Pending"
+                    className={`rounded-xl px-3 py-2 text-xs font-semibold border ${!canAct || req.status !== "Pending"
                         ? "bg-slate-100 text-slate-500 cursor-not-allowed"
                         : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
-                    }`}
+                      }`}
                   >
                     Reject
                   </button>

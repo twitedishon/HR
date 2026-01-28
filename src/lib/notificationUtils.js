@@ -11,49 +11,65 @@ export const notifyEmployee = async ({
   status,
   leaveType = "Leave Request",
 }) => {
-  if (!ownerId) return;
+  if (!ownerId) {
+    console.warn("notifyEmployee: No ownerId provided");
+    return;
+  }
+
+  console.log("notifyEmployee: Attempting to notify employee:", ownerId, "Status:", status);
 
   try {
-    // Primary: try to resolve auth_user_id from approvers
-    let { data: approver } = await supabase
-      .from("hrmss_approvers")
-      .select("auth_user_id")
-      .eq("id", ownerId)
+    let userIdToNotify = null;
+
+    // Strategy 1: Try hrmss_profiles by employee_id (for HR/Admin/Manager)
+    const { data: profileByEmpId } = await supabase
+      .from("hrmss_profiles")
+      .select("user_id, email")
+      .eq("employee_id", ownerId)
       .maybeSingle();
 
-    let userIdToNotify = approver?.auth_user_id;
+    if (profileByEmpId?.user_id) {
+      console.log("notifyEmployee: Found user_id via hrmss_profiles.employee_id:", profileByEmpId.user_id);
+      userIdToNotify = profileByEmpId.user_id;
+    }
 
-    // Secondary: resolve via hrmss_profiles (email -> approvers)
-    let profile;
+    // Strategy 2: Try hrmss_employee_profiles by employee_id (for Employees)
     if (!userIdToNotify) {
-      const profileRes = await supabase
-        .from("hrmss_profiles")
-        .select("email, user_id")
-        .eq("user_id", ownerId)
+      const { data: empProfile } = await supabase
+        .from("hrmss_employee_profiles")
+        .select("user_id")
+        .eq("employee_id", ownerId)
         .maybeSingle();
-      profile = profileRes?.data;
 
-      if (profile?.email) {
-        const { data: approverByEmail } = await supabase
-          .from("hrmss_approvers")
-          .select("auth_user_id")
-          .eq("email", profile.email)
-          .maybeSingle();
-        userIdToNotify = approverByEmail?.auth_user_id;
+      if (empProfile?.user_id) {
+        console.log("notifyEmployee: Found user_id via hrmss_employee_profiles:", empProfile.user_id);
+        userIdToNotify = empProfile.user_id;
       }
     }
 
-    // Final fallback: use profile.user_id or the ownerId itself
-    if (!userIdToNotify && profile?.user_id) {
-      userIdToNotify = profile.user_id;
+    // Strategy 3: Try hrmss_approvers
+    if (!userIdToNotify) {
+      const { data: approver } = await supabase
+        .from("hrmss_approvers")
+        .select("auth_user_id")
+        .eq("id", ownerId)
+        .maybeSingle();
+
+      if (approver?.auth_user_id) {
+        console.log("notifyEmployee: Found user_id via hrmss_approvers:", approver.auth_user_id);
+        userIdToNotify = approver.auth_user_id;
+      }
     }
-    if (!userIdToNotify && ownerId) {
+
+    // Strategy 4: Final fallback - use ownerId directly (might already be a UUID)
+    if (!userIdToNotify) {
+      console.log("notifyEmployee: Using ownerId as user_id fallback:", ownerId);
       userIdToNotify = ownerId;
     }
 
     if (!userIdToNotify) {
       console.warn(
-        `Cannot find auth_user_id for employee ${ownerId}. This user may not have a Supabase auth account set up.`
+        `notifyEmployee: Cannot find user_id for employee ${ownerId}. This user may not have a Supabase auth account set up.`
       );
       return;
     }
@@ -76,18 +92,20 @@ export const notifyEmployee = async ({
           : status === "Rejected"
             ? "error"
             : "info",
-      route: "/employee-dashboard/leave-management",
+      route: "/employee-dashboard/leave",
       unread: true,
     };
+
+    console.log("notifyEmployee: Inserting notification:", JSON.stringify(notificationData));
 
     const { error: notifError } = await supabase
       .from(EMP_NOTIF_TABLE)
       .insert(notificationData);
 
     if (notifError) {
-      console.error("Employee notification insert error:", notifError);
+      console.error("notifyEmployee: Insert error:", notifError);
     } else {
-      console.log("Employee notification sent successfully");
+      console.log("notifyEmployee: Successfully inserted notification for user:", userIdToNotify);
     }
 
     // ✅ Also insert to hrmss_notifications for admin/approver users
