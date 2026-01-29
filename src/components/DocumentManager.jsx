@@ -323,10 +323,17 @@ export default function DocumentManager({
     const offlineId = stringToUuid(`${stamp}.${fileName}.${docTitle.trim()}`);
     const isEmployee = normalizedPageRole === "employee";
 
+    // ✅ Special case: Approver employee treated like employee
+    const authCache = readAuthCache();
+    const approverEmail = authCache?.email || authCache?.official_email || authCache?.identifier || "";
+    const isApproverEmployee = normalizedPageRole === "admin" &&
+      String(approverEmail).trim().toLowerCase() === "haripriya@twite.ai";
+    const treatAsEmployee = isEmployee || isApproverEmployee;
+
     const offlineRow = {
       id: offlineId,
       user_id: userIdHint || userIdOverride || "offline",
-      role: normalizedPageRole || role || "unknown",
+      role: isApproverEmployee ? "employee" : (normalizedPageRole || role || "unknown"),
       title: docTitle.trim(),
       category,
       file_name: fileName,
@@ -334,11 +341,11 @@ export default function DocumentManager({
       size_bytes: file.size ?? null,
       bucket: null,
       storage_path: null,
-      status: isEmployee ? "pending" : "approved",
+      status: treatAsEmployee ? "pending" : "approved",
       submitted_at: new Date().toISOString(),
-      reviewed_at: isEmployee ? null : new Date().toISOString(),
-      reviewed_by: isEmployee ? null : (userIdHint || userIdOverride || null),
-      review_note: isEmployee ? null : "Offline upload",
+      reviewed_at: treatAsEmployee ? null : new Date().toISOString(),
+      reviewed_by: treatAsEmployee ? null : (userIdHint || userIdOverride || null),
+      review_note: treatAsEmployee ? null : "Offline upload",
       created_at: new Date().toISOString(),
       local_data_url: localDataUrl,
     };
@@ -627,7 +634,14 @@ export default function DocumentManager({
       const empId = resolveEmployeeId({ authCache, legacyEmployeeSignin });
 
       const isEmployee = normalizedPageRole === "employee";
-      const userId = (isEmployee && empId) ? empId : user.id;
+
+      // ✅ Special case: Approver employee should be treated like employee for document uploads
+      const approverEmail = authCache?.email || authCache?.official_email || authCache?.identifier || "";
+      const isApproverEmployee = normalizedPageRole === "admin" &&
+        String(approverEmail).trim().toLowerCase() === "haripriya@twite.ai";
+      const treatAsEmployee = isEmployee || isApproverEmployee;
+
+      const userId = (treatAsEmployee && empId) ? empId : user.id;
 
       const fileName = safeFileName(file.name);
       const stamp = Date.now();
@@ -642,7 +656,7 @@ export default function DocumentManager({
 
       const payload = {
         user_id: userId,
-        role: normalizedPageRole,
+        role: isApproverEmployee ? "employee" : normalizedPageRole, // Save as employee role for HR review
         title: docTitle.trim(),
         category,
         file_name: fileName,
@@ -650,11 +664,11 @@ export default function DocumentManager({
         size_bytes: file.size ?? null,
         bucket: BUCKET,
         storage_path: storagePath,
-        status: isEmployee ? "pending" : "approved",
+        status: treatAsEmployee ? "pending" : "approved",
         submitted_at: new Date().toISOString(),
-        reviewed_at: isEmployee ? null : new Date().toISOString(),
-        reviewed_by: isEmployee ? null : userId,
-        review_note: isEmployee ? null : "Auto-approved HR upload",
+        reviewed_at: treatAsEmployee ? null : new Date().toISOString(),
+        reviewed_by: treatAsEmployee ? null : userId,
+        review_note: treatAsEmployee ? null : "Auto-approved HR upload",
       };
 
       const { data: inserted, error: insErr } = await supabase
