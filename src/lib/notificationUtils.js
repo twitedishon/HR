@@ -147,6 +147,7 @@ export const notifyEmployee = async ({
 export const notifyManagerNewRequest = async ({
   managerId,
   managerName,
+  managerEmail, // ✅ Added for target_email filtering
   employeeName,
   leaveType,
   fromDate,
@@ -192,6 +193,7 @@ export const notifyManagerNewRequest = async ({
       route: "/manager-approver-dashboard/approvals",
       audience: "manager",
       unread: true,
+      target_email: managerEmail || manager?.email || "", // ✅ Target specific manager
     };
 
     const { error: notifError } = await supabase

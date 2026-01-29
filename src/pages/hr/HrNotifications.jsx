@@ -41,6 +41,40 @@ const SOURCE_ROUTE = {
   Birthday: "/hr-dashboard/people",
 };
 
+// ✅ User-specific localStorage keys for HR
+const DISMISSED_KEY = "hrmss.notifications.dismissed.hr";
+const READ_KEY = "hrmss.notifications.read.hr";
+
+function getDismissedIds() {
+  try {
+    const raw = localStorage.getItem(DISMISSED_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function addDismissedIds(ids) {
+  const current = getDismissedIds();
+  const updated = [...new Set([...current, ...ids])];
+  localStorage.setItem(DISMISSED_KEY, JSON.stringify(updated));
+}
+
+function getReadIds() {
+  try {
+    const raw = localStorage.getItem(READ_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function addReadIds(ids) {
+  const current = getReadIds();
+  const updated = [...new Set([...current, ...ids])];
+  localStorage.setItem(READ_KEY, JSON.stringify(updated));
+}
+
 /** ✅ Row cards */
 const SAGE = "#89AF8E";
 
@@ -338,10 +372,10 @@ export default function HrNotifications() {
           .order("created_at", { ascending: false }),
         userId
           ? supabase
-              .from("employee_notifications")
-              .select("id,title,message,type,route,unread,created_at")
-              .eq("user_id", userId)
-              .order("created_at", { ascending: false })
+            .from("employee_notifications")
+            .select("id,title,message,type,route,unread,created_at")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
           : Promise.resolve({ data: [], error: null }),
       ]);
 
@@ -378,7 +412,16 @@ export default function HrNotifications() {
         })),
       ].sort((a, b) => (new Date(b.created_at) - new Date(a.created_at)));
 
-      setItems(mapped);
+      // ✅ Filter out dismissed notifications and apply user-specific read state
+      const dismissedIds = getDismissedIds();
+      const readIds = getReadIds();
+
+      const filteredMapped = mapped.filter(n => !dismissedIds.includes(n.id)).map(n => ({
+        ...n,
+        unread: readIds.includes(n.id) ? false : n.unread,
+      }));
+
+      setItems(filteredMapped);
     } catch (error) {
       console.error("Notifications fetch error:", error);
       setItems([]);
@@ -405,8 +448,8 @@ export default function HrNotifications() {
           status === "All"
             ? true
             : status === "Unread"
-            ? n.unread === true
-            : n.unread === false;
+              ? n.unread === true
+              : n.unread === false;
 
         const timeText = n.timeLabel || n.created_at || "";
         const text = `${n.title} ${n.detail} ${n.source} ${timeText}`.toLowerCase();
@@ -440,14 +483,12 @@ export default function HrNotifications() {
   const clearSelection = () => setSelected(new Set());
   const selectAllFiltered = () => setSelected(() => new Set(filtered.map((x) => x.id)));
 
+  // ✅ mark read (user-specific, stored in localStorage)
   const markRead = async (ids) => {
     if (!ids?.length) return;
 
-    const { error } = await supabase.from(TABLE).update({ unread: false }).in("id", ids);
-    if (error) {
-      console.error("Mark read error:", error);
-      return;
-    }
+    // Store read state in localStorage for this HR user
+    addReadIds(ids);
 
     setItems((prev) => prev.map((x) => (ids.includes(x.id) ? { ...x, unread: false } : x)));
     setSelected((prev) => {
@@ -457,15 +498,14 @@ export default function HrNotifications() {
     });
   };
 
+  // ✅ dismiss notification (user-specific, stored in localStorage - doesn't delete from DB)
   const remove = async (ids) => {
     if (!ids?.length) return;
 
-    const { error } = await supabase.from(TABLE).delete().in("id", ids);
-    if (error) {
-      console.error("Delete error:", error);
-      return;
-    }
+    // Store dismissed IDs in localStorage for this HR user only
+    addDismissedIds(ids);
 
+    // Remove from local state
     setItems((prev) => prev.filter((x) => !ids.includes(x.id)));
     setSelected((prev) => {
       const next = new Set(prev);
@@ -555,11 +595,6 @@ export default function HrNotifications() {
                 className="w-full rounded-2xl border bg-slate-50 pl-9 pr-3 py-2 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-slate-900/10"
               />
             </div>
-
-            <div className="hidden md:flex items-center gap-2">
-              <Filter size={16} className="text-slate-500" />
-              <span className="text-xs text-slate-500">Filters</span>
-            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -578,31 +613,8 @@ export default function HrNotifications() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Chip active={source === "All"} onClick={() => setSource("All")}>
-            All Modules
-          </Chip>
-          {ALLOWED_SOURCES.map((s) => (
-            <Chip key={s} active={source === s} onClick={() => setSource(s)}>
-              {s}
-            </Chip>
-          ))}
-        </div>
-
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-2">
-            <button
-              onClick={selectAllFiltered}
-              className="text-xs font-semibold rounded-full border px-3 py-1.5 hover:bg-slate-50"
-            >
-              Select all (filtered)
-            </button>
-            <button
-              onClick={clearSelection}
-              className="text-xs font-semibold rounded-full border px-3 py-1.5 hover:bg-slate-50"
-            >
-              Clear
-            </button>
             {selectedCount > 0 ? (
               <span className="text-xs text-slate-500">{selectedCount} selected</span>
             ) : null}

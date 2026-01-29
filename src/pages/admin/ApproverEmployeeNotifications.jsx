@@ -28,6 +28,50 @@ const SOURCE_ROUTE = {
   LeaveManagement: "/dashboard/leave",
 };
 
+// ✅ User-specific localStorage keys for approver employee
+const AUTH_KEY = "HRMSS_AUTH_SESSION";
+const DISMISSED_KEY = "hrmss.notifications.dismissed.approver";
+const READ_KEY = "hrmss.notifications.read.approver";
+
+function readAuthSession() {
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getDismissedIds() {
+  try {
+    const raw = localStorage.getItem(DISMISSED_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function addDismissedIds(ids) {
+  const current = getDismissedIds();
+  const updated = [...new Set([...current, ...ids])];
+  localStorage.setItem(DISMISSED_KEY, JSON.stringify(updated));
+}
+
+function getReadIds() {
+  try {
+    const raw = localStorage.getItem(READ_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function addReadIds(ids) {
+  const current = getReadIds();
+  const updated = [...new Set([...current, ...ids])];
+  localStorage.setItem(READ_KEY, JSON.stringify(updated));
+}
+
 const tone = {
   success: {
     pill: "bg-emerald-50 text-emerald-700 ring-emerald-200",
@@ -234,22 +278,52 @@ export default function AdminNotifications() {
   const [status, setStatus] = useState("All");
   const [selected, setSelected] = useState(() => new Set());
 
-  // ✅ fetch notifications
+  // ✅ fetch notifications (with user-specific filtering by target_email)
   const fetchNotifications = async () => {
     setLoading(true);
 
-    const { data, error } = await supabase
+    // Get current user's email from auth session
+    const authSession = readAuthSession();
+    const currentUserEmail = String(
+      authSession?.email ||
+      authSession?.official_email ||
+      authSession?.identifier ||
+      ""
+    ).trim().toLowerCase();
+
+    // Fetch notifications targeted to this specific approver
+    let query = supabase
       .from(TABLE)
-      .select("id,title,detail,type,source,route,unread,created_at")
+      .select("id,title,detail,type,source,route,unread,created_at,target_email")
       .in("source", ALLOWED_SOURCES)
-      .in("audience", ["admin", "all"]) // show admin/all
+      .in("audience", ["admin", "all"])
       .order("created_at", { ascending: false });
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("Notifications fetch error:", error);
       setItems([]);
     } else {
-      setItems(data || []);
+      // ✅ Filter to show only notifications targeted to this specific approver
+      const dismissedIds = getDismissedIds();
+      const readIds = getReadIds();
+
+      const filteredData = (data || [])
+        .filter(n => {
+          // Only show notifications targeted to this user's email
+          const targetEmail = String(n.target_email || "").trim().toLowerCase();
+          // Show if target_email matches current user, or if target_email is empty (legacy notifications)
+          return !targetEmail || targetEmail === currentUserEmail;
+        })
+        .filter(n => !dismissedIds.includes(n.id))
+        .map(n => ({
+          ...n,
+          // Override unread status with user-specific read state
+          unread: readIds.includes(n.id) ? false : n.unread,
+        }));
+
+      setItems(filteredData);
     }
 
     setSelected(new Set());
@@ -303,15 +377,12 @@ export default function AdminNotifications() {
 
   const clearSelection = () => setSelected(new Set());
 
-  // ✅ mark read in DB + local
+  // ✅ mark read (user-specific, stored in localStorage)
   const markRead = async (ids) => {
     if (!ids?.length) return;
 
-    const { error } = await supabase.from(TABLE).update({ unread: false }).in("id", ids);
-    if (error) {
-      console.error("Mark read error:", error);
-      return;
-    }
+    // Store read state in localStorage for this user
+    addReadIds(ids);
 
     setItems((prev) => prev.map((x) => (ids.includes(x.id) ? { ...x, unread: false } : x)));
     setSelected((prev) => {
@@ -321,16 +392,14 @@ export default function AdminNotifications() {
     });
   };
 
-  // ✅ delete in DB + local
+  // ✅ dismiss notification (user-specific, stored in localStorage - doesn't delete from DB)
   const remove = async (ids) => {
     if (!ids?.length) return;
 
-    const { error } = await supabase.from(TABLE).delete().in("id", ids);
-    if (error) {
-      console.error("Delete error:", error);
-      return;
-    }
+    // Store dismissed IDs in localStorage for this user only
+    addDismissedIds(ids);
 
+    // Remove from local state
     setItems((prev) => prev.filter((x) => !ids.includes(x.id)));
     setSelected((prev) => {
       const next = new Set(prev);

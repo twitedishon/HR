@@ -1220,16 +1220,22 @@ export default function EmployeeLeaveManagement() {
 
     // ✅ Notify admins/approvers via hrmss_notifications (used by admin notifications UI)
     try {
-      const notifRows = rowsToInsert.map((row) => ({
-        title: "New Leave Request",
-        detail: `${EMP.name} submitted a ${row.leave_type} (${row.mode}) request for ${row.from_date}${row.to_date ? ` to ${row.to_date}` : ""
-          }.`,
-        type: "info",
-        source: "LeaveManagement",
-        route: "/dashboard/leave",
-        audience: "admin",
-        unread: true,
-      }));
+      const notifRows = rowsToInsert.map((row) => {
+        // Get the approver's email for targeting
+        const approver = approverById.get(row.request_to_id);
+        const targetEmail = approver?.email || "";
+
+        return {
+          title: "New Leave Request",
+          detail: `${EMP.name} submitted a ${row.leave_type} (${row.mode}) request for ${row.from_date}${row.to_date ? ` to ${row.to_date}` : ""}.`,
+          type: "info",
+          source: "LeaveManagement",
+          route: "/dashboard/leave",
+          audience: "admin",
+          unread: true,
+          target_email: targetEmail, // ✅ Target specific approver
+        };
+      });
 
       await supabase.from("hrmss_notifications").insert(notifRows);
     } catch (notifErr) {
