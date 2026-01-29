@@ -197,13 +197,13 @@ export default function Login() {
     if (error) throw new Error(error.message || "Login failed");
     if (!data) throw new Error("Invalid credentials");
 
-    
+
     // ✅ Don't expose internal errors like "role mismatch" - show generic message
     if (data.error) {
       console.error("Login error:", data.error); // Log for debugging
       throw new Error("Invalid credentials or access denied");
     }
-    
+
     return data;
   };
 
@@ -224,7 +224,7 @@ export default function Login() {
 
     if (error) throw new Error(error.message || "Manager login failed");
 
-    
+
     // 2. If valid data, return it
     if (data) return data;
 
@@ -248,7 +248,7 @@ export default function Login() {
       console.error("Debug execution failed:", e);
     }
 
-      throw new Error("Invalid email or password");
+    throw new Error("Invalid email or password");
   };
 
   // ✅ Check HR/Admin/Manager profile exists in hrmss_profiles
@@ -305,7 +305,7 @@ export default function Login() {
     } catch {
       try {
         localStorage.setItem(DOCS_AUTH_KEY, JSON.stringify(payload));
-      } catch {}
+      } catch { }
     }
   };
 
@@ -329,7 +329,7 @@ export default function Login() {
       // Keep app login working, only warn in console. 
       // Background sync is secondary to app-level RPC login.
       console.warn(`[DocsAuth] Background sync warning for ${roleLabelForError || "user"}:`, e.message);
-      
+
       return false;
     }
   };
@@ -389,10 +389,22 @@ export default function Login() {
 
         const isHariPriya =
           String(hrEmail || "").trim().toLowerCase() ===
-            "haripriya@twite.ai" &&
+          "haripriya@twite.ai" &&
           String(hrPassword || "").trim() === "Twite@HariPriya";
 
         if (isHariPriya) {
+          // ✅ Approver employee: check profile completion before redirecting
+          const employeeProfileDone = await employeeProfileCompleted(null, hrEmail);
+          localStorage.setItem(COMPLETION_KEY("admin"), employeeProfileDone ? "true" : "false");
+
+          if (!employeeProfileDone) {
+            navigate("/sign-in", {
+              replace: true,
+              state: { role: "admin", redirectTo: roleRedirects.admin },
+            });
+            return;
+          }
+
           navigate(roleRedirects.admin, { replace: true });
           return;
         }
@@ -427,8 +439,8 @@ export default function Login() {
         if (managerSessionFromVerify) {
           const access = String(
             managerSessionFromVerify.access ||
-              managerSessionFromVerify.role ||
-              "viewer"
+            managerSessionFromVerify.role ||
+            "viewer"
           ).toLowerCase();
 
           const route =
@@ -684,8 +696,17 @@ export default function Login() {
         );
 
         if (isHariPriyaEmployee) {
-          // Mark admin setup as done and send directly to the admin dashboard
-          localStorage.setItem(COMPLETION_KEY("admin"), "true");
+          // ✅ Approver employee: check profile completion before redirecting
+          localStorage.setItem(COMPLETION_KEY("admin"), completed ? "true" : "false");
+
+          if (!completed) {
+            navigate("/sign-in", {
+              replace: true,
+              state: { role: "admin", redirectTo: roleRedirects.admin },
+            });
+            return;
+          }
+
           navigate(roleRedirects.admin, { replace: true });
           return;
         }
@@ -703,12 +724,12 @@ export default function Login() {
       }
     } catch (ex) {
 
-    const friendlyMessage =
-      typeof ex?.message === "string" &&
-      ex.message.toLowerCase().includes("invalid")
-        ? "Invalid email or password"
-        : ex?.message || "Login failed";
-    setErr(friendlyMessage);
+      const friendlyMessage =
+        typeof ex?.message === "string" &&
+          ex.message.toLowerCase().includes("invalid")
+          ? "Invalid email or password"
+          : ex?.message || "Login failed";
+      setErr(friendlyMessage);
     } finally {
       setLoading(false);
     }
@@ -720,11 +741,10 @@ export default function Login() {
       <button
         type="button"
         onClick={() => resetFields(value)}
-        className={`text-sm font-semibold pb-2 transition ${
-          active
+        className={`text-sm font-semibold pb-2 transition ${active
             ? "text-purple-700 border-b-2 border-purple-700"
             : "text-gray-500 hover:text-gray-700"
-        }`}
+          }`}
       >
         {label}
       </button>
@@ -868,11 +888,10 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className={`w-full py-3 rounded-md text-white font-semibold transition shadow-md ${
-                    loading
+                  className={`w-full py-3 rounded-md text-white font-semibold transition shadow-md ${loading
                       ? "bg-purple-400 cursor-not-allowed"
                       : "bg-purple-700 hover:bg-purple-800"
-                  }`}
+                    }`}
                 >
                   {loading ? "Logging in..." : "Login"}
                 </button>

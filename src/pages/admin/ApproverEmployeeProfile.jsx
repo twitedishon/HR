@@ -109,12 +109,12 @@ function rowToAdminProfile(row, base = seedAdminProfile) {
   const emergencyContacts =
     row?.emergency_name || row?.emergency_contact_number
       ? [
-          {
-            name: row?.emergency_name || "",
-            relation: row?.emergency_relationship || "",
-            phone: row?.emergency_contact_number || "",
-          },
-        ]
+        {
+          name: row?.emergency_name || "",
+          relation: row?.emergency_relationship || "",
+          phone: row?.emergency_contact_number || "",
+        },
+      ]
       : base?.emergencyContacts || [];
 
   return {
@@ -263,6 +263,26 @@ export default function AdminProfile() {
             authCache?.officialEmail ||
             authCache?.email ||
             null;
+
+          // ✅ Special case: Approver employee - fetch from hrmss_employee_profiles first
+          const isApproverEmployee =
+            String(authEmail || "").trim().toLowerCase() === "haripriya@twite.ai";
+
+          if (isApproverEmployee && authEmail) {
+            const { data: empProfileRow, error: empProfileErr } = await supabase
+              .from("hrmss_employee_profiles")
+              .select("*")
+              .or(`official_email.ilike.${authEmail},personal_email.ilike.${authEmail}`)
+              .maybeSingle();
+
+            if (!empProfileErr && empProfileRow && mounted) {
+              const next = rowToAdminProfile(empProfileRow, seedAdminProfile);
+              const cacheKey = PROFILE_CACHE_KEY(userId);
+              localStorage.setItem(cacheKey, JSON.stringify(next));
+              setProfile(next);
+              return; // Successfully loaded approver profile
+            }
+          }
 
           const orFilters = [
             `user_id.eq.${userId}`,
@@ -420,6 +440,50 @@ export default function AdminProfile() {
         profile_completed: true,
       };
 
+      // ✅ Special case: Approver employee - save to hrmss_employee_profiles
+      const authEmail = authCache?.official_email || authCache?.officialEmail || authCache?.email || "";
+      const isApproverEmployee = String(authEmail).trim().toLowerCase() === "haripriya@twite.ai";
+
+      if (isApproverEmployee) {
+        const empPayload = {
+          employee_id: updated.job?.employeeId || updated.id || null,
+          profile_key: updated.job?.employeeId || authEmail,
+          profile_completed: true,
+          full_name: updated.name || null,
+          dob: updated.personal?.dob || null,
+          gender: updated.personal?.gender || null,
+          marital_status: updated.personal?.maritalStatus || null,
+          blood_group: updated.personal?.bloodGroup || null,
+          personal_email: updated.personal?.personalEmail || null,
+          official_email: updated.personal?.officialEmail || authEmail || null,
+          mobile_number: updated.personal?.mobileNumber || null,
+          alternate_contact_number: updated.personal?.alternateContactNumber || null,
+          current_address: updated.personal?.currentAddress || null,
+          permanent_address: updated.personal?.permanentAddress || null,
+          education: Array.isArray(updated.education) ? updated.education : [],
+          experience: Array.isArray(updated.experience) ? updated.experience : [],
+          primary_skills: updated.skills?.primarySkills || null,
+          secondary_skills: updated.skills?.secondarySkills || null,
+          tools_technologies: updated.skills?.toolsTechnologies || null,
+          account_holder_name: updated.bank?.accountHolderName || null,
+          bank_name: updated.bank?.bankName || null,
+          account_number: updated.bank?.accountNumber || null,
+          ifsc_code: updated.bank?.ifscCode || null,
+          branch: updated.bank?.branch || null,
+          emergency_name: emergency?.name || null,
+          emergency_relationship: emergency?.relation || null,
+          emergency_contact_number: emergency?.phone || null,
+          location: updated.job?.location || null,
+          avatar_url: updated.avatar || null,
+        };
+
+        const { error } = await supabase
+          .from("hrmss_employee_profiles")
+          .upsert(empPayload, { onConflict: "official_email" });
+        if (error) throw error;
+        return true;
+      }
+
       const { error } = await supabase.from("hrmss_profiles").upsert(payload, {
         onConflict: "user_id",
       });
@@ -462,7 +526,7 @@ export default function AdminProfile() {
         if (cacheKey) {
           try {
             localStorage.setItem(cacheKey, JSON.stringify(next));
-          } catch {}
+          } catch { }
         }
         return next;
       });
@@ -477,7 +541,7 @@ export default function AdminProfile() {
 
           try {
             URL.revokeObjectURL(previewUrl);
-          } catch {}
+          } catch { }
           return;
         }
       }
@@ -487,14 +551,14 @@ export default function AdminProfile() {
 
       try {
         URL.revokeObjectURL(previewUrl);
-      } catch {}
+      } catch { }
     } catch (err) {
       console.error("Avatar update failed:", err);
       setSaveError(err?.message || "Failed to update avatar");
       try {
         const dataUrl = await fileToDataUrl(file);
         await saveLocalAvatar(dataUrl);
-      } catch {}
+      } catch { }
     }
   };
 
@@ -670,7 +734,13 @@ export default function AdminProfile() {
                     <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-5">
                       <Detail label="ORGANIZATION" value={ex.organization} />
                       <Detail label="DESIGNATION" value={ex.designation} />
-                      <Detail label="DURATION" value={ex.duration} />
+                      <Detail
+                        label="DURATION"
+                        value={
+                          ex.duration ||
+                          (ex.fromDate ? `${ex.fromDate} - ${ex.isPresent ? "Present" : (ex.toDate || "Present")}` : "-")
+                        }
+                      />
                       <Detail label="REASON FOR LEAVING" value={ex.reasonForLeaving} />
                     </div>
                   </div>
@@ -730,34 +800,6 @@ export default function AdminProfile() {
             )}
           </SectionCard>
 
-          <SectionCard
-            title="ID Proofs"
-            action={
-              <button onClick={() => setAddId(true)} className="text-blue-600 text-sm">
-                Upload
-              </button>
-            }
-          >
-            {idProofs?.length ? (
-              idProofs.map((d, i) => (
-                <div key={i} className="flex items-start justify-between gap-3 rounded-xl border p-3">
-                  <div>
-                    <p className="font-medium">{d.type}</p>
-                    <p className="text-xs text-slate-600">{d.number}</p>
-                  </div>
-                  <div className="text-right">
-                    <Badge tone={d.status === "Verified" ? "success" : "warning"}>{d.status}</Badge>
-                    <button onClick={() => setEditId(i)} className="block text-xs text-blue-600 mt-2">
-                      Edit
-                    </button>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <EmptyHint icon={IdCard} text="No ID proofs uploaded yet." />
-            )}
-          </SectionCard>
-
           <SectionCard title="Quick Contact">
             <div className="space-y-3 pt-2">
               <QuickRow icon={Mail} label="Personal Email" value={personal?.personalEmail || personal?.email} />
@@ -772,11 +814,11 @@ export default function AdminProfile() {
       </div>
 
       <DocumentManager
-  title="My Documents"
-  subtitle="Upload and access your admin documents"
-  accent="blue"
-  role="admin"
-/>
+        title="My Documents"
+        subtitle="Upload and access your admin documents"
+        accent="blue"
+        role="admin"
+      />
 
 
       <Divider label="End of Profile" />

@@ -141,11 +141,11 @@ function mapDbToForm(row, empIdFromLogin = "", userEmail = "") {
         : form.education,
     experience: Array.isArray(row.experience)
       ? row.experience.map(ex => ({
-          ...ex,
-          fromDate: ex.fromDate || (ex.duration ? String(ex.duration).split(" - ")[0] : ""),
-          toDate: ex.toDate || (ex.duration ? String(ex.duration).split(" - ")[1] : ""),
-          isPresent: ex.isPresent || (ex.duration && String(ex.duration).toLowerCase().includes("present"))
-        }))
+        ...ex,
+        fromDate: ex.fromDate || (ex.duration ? String(ex.duration).split(" - ")[0] : ""),
+        toDate: ex.toDate || (ex.duration ? String(ex.duration).split(" - ")[1] : ""),
+        isPresent: ex.isPresent || (ex.duration && String(ex.duration).toLowerCase().includes("present"))
+      }))
       : form.experience,
 
     primarySkills: row.primary_skills ?? "",
@@ -177,7 +177,7 @@ function mapDbToForm(row, empIdFromLogin = "", userEmail = "") {
     totalExpFrom: row.total_exp_from || (row.total_experience ? String(row.total_experience).split(" - ")[0] : ""),
     totalExpTo: row.total_exp_to || (row.total_experience ? String(row.total_experience).split(" - ")[1] : ""),
     totalExpPresent: row.total_exp_present || (row.total_experience && String(row.total_experience).toLowerCase().includes("present")),
-    
+
     relevantExpFrom: row.relevant_exp_from || (row.relevant_experience ? String(row.relevant_experience).split(" - ")[0] : ""),
     relevantExpTo: row.relevant_exp_to || (row.relevant_experience ? String(row.relevant_experience).split(" - ")[1] : ""),
     relevantExpPresent: row.relevant_exp_present || (row.relevant_experience && String(row.relevant_experience).toLowerCase().includes("present")),
@@ -290,7 +290,7 @@ export default function EmployeeSignIn() {
   const empIdFromLogin = location.state?.empId || "";
 
 
-const [error, setError] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -347,6 +347,38 @@ const [error, setError] = useState("");
 
 
           await hydrateJobInfoFromEmployees(empId, setForm, jobInfoMerged, () => mounted);
+          return;
+        }
+
+        // ✅ Special case: Approver employee (admin role but actually an employee)
+        const approverEmail = authCache?.email || authCache?.identifier || "";
+        const isApproverEmployee = role === "admin" &&
+          String(approverEmail).trim().toLowerCase() === "haripriya@twite.ai";
+
+        if (isApproverEmployee) {
+          // Fetch from hrmss_employee_profiles using email (like employee flow)
+          const { data: empRow, error: empErr } = await supabase
+            .from("hrmss_employee_profiles")
+            .select("*")
+            .or(`official_email.eq.${approverEmail},personal_email.eq.${approverEmail}`)
+            .maybeSingle();
+
+          if (empErr) throw empErr;
+          if (!mounted) return;
+
+          const empId = empRow?.employee_id || authCache?.employee_id || "";
+
+          if (empRow) {
+            setForm(mapDbToForm(empRow, empId, approverEmail));
+          } else {
+            // Start with empty form for fresh profile
+            setForm(emptyForm(empId, approverEmail));
+          }
+
+          // Hydrate job info from hrmss_employees table
+          if (empId) {
+            await hydrateJobInfoFromEmployees(empId, setForm, jobInfoMerged, () => mounted);
+          }
           return;
         }
 
@@ -456,7 +488,7 @@ const [error, setError] = useState("");
     if (form.avatar && String(form.avatar).startsWith("blob:")) {
       try {
         URL.revokeObjectURL(form.avatar);
-      } catch {}
+      } catch { }
     }
 
     setAvatarFile(file);
@@ -468,7 +500,7 @@ const [error, setError] = useState("");
     if (form.avatar && String(form.avatar).startsWith("blob:")) {
       try {
         URL.revokeObjectURL(form.avatar);
-      } catch {}
+      } catch { }
     }
     setAvatarFile(null);
     setAvatarRemoved(true);
@@ -594,14 +626,14 @@ const [error, setError] = useState("");
           onChange("avatar", avatar_url);
           try {
             URL.revokeObjectURL(old);
-          } catch {}
+          } catch { }
         }
 
 
         try {
           const cacheForm = { ...form, employeeId: empId, avatar: avatar_url || "" };
           localStorage.setItem(PROFILE_CACHE_KEY("employee", empId), JSON.stringify(cacheForm));
-        } catch {}
+        } catch { }
 
         localStorage.setItem(COMPLETION_KEY(role), "true");
 
@@ -612,8 +644,79 @@ const [error, setError] = useState("");
         return;
       }
 
-      // ✅ Other roles (HR, Admin, etc.)
+      // ✅ Approver employee: save to hrmss_employee_profiles (like employee)
       const authCache = readAuthSession();
+      const approverEmail = authCache?.email || authCache?.identifier || "";
+      const isApproverEmployee = role === "admin" &&
+        String(approverEmail).trim().toLowerCase() === "haripriya@twite.ai";
+
+      if (isApproverEmployee) {
+        const empId = String(form.employeeId || authCache?.employee_id || "").trim();
+
+        let avatar_url = form.avatar || "";
+        if (avatarRemoved) {
+          avatar_url = null;
+        } else if (avatarFile) {
+          avatar_url = await uploadAvatar({ folderKey: empId || approverEmail, file: avatarFile });
+        } else {
+          if (String(avatar_url).startsWith("blob:")) avatar_url = null;
+        }
+
+        const payload = {
+          employee_id: empId || null,
+          profile_key: empId || approverEmail,
+          profile_completed: true,
+          full_name: form.fullName || null,
+          dob: form.dob || null,
+          gender: form.gender || null,
+          marital_status: form.maritalStatus || null,
+          blood_group: form.bloodGroup || null,
+          personal_email: form.personalEmail || null,
+          official_email: form.officialEmail || approverEmail || null,
+          mobile_number: form.mobileNumber || null,
+          alternate_contact_number: form.alternateContactNumber || null,
+          current_address: form.currentAddress || null,
+          permanent_address: form.permanentAddress || null,
+          education: Array.isArray(form.education) ? form.education : [],
+          experience: Array.isArray(form.experience) ? form.experience : [],
+          primary_skills: form.primarySkills || null,
+          secondary_skills: form.secondarySkills || null,
+          tools_technologies: form.toolsTechnologies || null,
+          account_holder_name: form.accountHolderName || null,
+          bank_name: form.bankName || null,
+          account_number: form.accountNumber || null,
+          ifsc_code: form.ifscCode || null,
+          branch: form.branch || null,
+          emergency_name: form.emergencyName || null,
+          emergency_relationship: form.emergencyRelationship || null,
+          emergency_contact_number: form.emergencyContactNumber || null,
+          location: form.location || null,
+          avatar_url: avatar_url || null,
+          total_experience: form.totalExpFrom ? `${form.totalExpFrom} - ${(!form.totalExpTo || form.totalExpPresent) ? "Present" : form.totalExpTo}` : null,
+          relevant_experience: form.relevantExpFrom ? `${form.relevantExpFrom} - ${(!form.relevantExpTo || form.relevantExpPresent) ? "Present" : form.relevantExpTo}` : null,
+        };
+
+        // Upsert using official_email since approver may not have employee_id yet
+        const { error: upErr } = await supabase
+          .from("hrmss_employee_profiles")
+          .upsert(payload, { onConflict: empId ? "employee_id" : "official_email" });
+
+        if (upErr) throw upErr;
+
+        if (avatar_url && String(form.avatar).startsWith("blob:")) {
+          const old = form.avatar;
+          onChange("avatar", avatar_url);
+          try { URL.revokeObjectURL(old); } catch { }
+        }
+
+        localStorage.setItem(COMPLETION_KEY("admin"), "true");
+
+        if (isEditMode) navigate(-1);
+        else navigate(redirectTo || ROLE_REDIRECTS.admin, { replace: true });
+        return;
+      }
+
+      // ✅ Other roles (HR, Admin, etc.)
       const { data: sessionData } = await supabase.auth.getSession();
       const user = sessionData?.session?.user || null;
 
@@ -692,18 +795,18 @@ const [error, setError] = useState("");
         onChange("avatar", avatar_url);
         try {
           URL.revokeObjectURL(old);
-        } catch {}
+        } catch { }
       }
 
 
       try {
         const cacheForm = { ...form, avatar: avatar_url || "" };
         localStorage.setItem(PROFILE_CACHE_KEY(role, userId), JSON.stringify(cacheForm));
-      } catch {}
+      } catch { }
 
       localStorage.setItem(COMPLETION_KEY(role), "true");
 
-      
+
       if (isEditMode) navigate(-1);
       else navigate(redirectTo, { replace: true });
 
@@ -762,7 +865,7 @@ const [error, setError] = useState("");
                   if (form.avatar && String(form.avatar).startsWith("blob:")) {
                     try {
                       URL.revokeObjectURL(form.avatar);
-                    } catch {}
+                    } catch { }
                   }
                   setAvatarFile(null);
                   setAvatarRemoved(false);
@@ -780,7 +883,7 @@ const [error, setError] = useState("");
 
               className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-purple-700 text-xs font-black text-white uppercase tracking-widest hover:bg-purple-800 shadow-lg shadow-purple-100 disabled:opacity-50 transition-all hover:scale-[1.02] active:scale-95"
             >
-              <Save size={16} /> 
+              <Save size={16} />
               {saving ? "Processing..." : isEditMode ? "Save Changes" : "Finish Setup"}
             </button>
           </div>
@@ -885,7 +988,7 @@ const [error, setError] = useState("");
                 <Divider />
 
                 <SectionHeader icon={Briefcase} title="Job Experience" subtitle="Overall work experience details" />
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <p className="text-[11px] uppercase tracking-wide text-slate-500 font-bold">Total Work Experience</p>
@@ -1011,7 +1114,7 @@ const [error, setError] = useState("");
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Input icon={Building2} label="ORGANIZATION" value={row.organization} onChange={(v) => updateExperience(idx, "organization", v)} placeholder="Company name" />
                         <Input icon={Briefcase} label="DESIGNATION" value={row.designation} onChange={(v) => updateExperience(idx, "designation", v)} placeholder="Software Engineer" />
-                        
+
                         <div className="space-y-2">
                           <p className="text-[11px] uppercase tracking-wide text-slate-500 font-bold">Duration</p>
                           <div className="grid grid-cols-2 gap-3">
@@ -1063,9 +1166,7 @@ const [error, setError] = useState("");
                 </div>
 
                 <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="text-xs text-slate-500">
-                    Tip: Save pannitu dashboard ku poidum. Next time open panna details auto fill aagum.
-                  </div>
+
 
                   <button
                     type="button"
@@ -1074,7 +1175,7 @@ const [error, setError] = useState("");
 
                     className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-950 shadow disabled:opacity-60 transition-all active:scale-95"
                   >
-                    <Save size={16} /> 
+                    <Save size={16} />
                     {saving ? "Saving..." : isEditMode ? "Update Profile" : "Finish Setup"}
                   </button>
                 </div>
