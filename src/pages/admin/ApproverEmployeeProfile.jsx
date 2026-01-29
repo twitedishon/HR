@@ -276,7 +276,36 @@ export default function AdminProfile() {
               .maybeSingle();
 
             if (!empProfileErr && empProfileRow && mounted) {
-              const next = rowToAdminProfile(empProfileRow, seedAdminProfile);
+              let next = rowToAdminProfile(empProfileRow, seedAdminProfile);
+
+              // ✅ Also fetch job info from hrmss_employees table
+              const empId = empProfileRow?.employee_id || authCache?.employee_id || "";
+              if (empId) {
+                const { data: empRow, error: empErr } = await supabase
+                  .from("hrmss_employees")
+                  .select("*")
+                  .eq("employee_id", empId)
+                  .maybeSingle();
+
+                if (!empErr && empRow) {
+                  // Merge job info from hrmss_employees
+                  next = {
+                    ...next,
+                    job: {
+                      ...next.job,
+                      employeeId: empRow.employee_id || next.job?.employeeId || "",
+                      department: empRow.department || next.job?.department || "",
+                      title: empRow.designation || empRow.role || next.job?.title || "",
+                      manager: empRow.reporting_manager || next.job?.manager || "",
+                      joiningDate: empRow.join_date || empRow.joining_date || next.job?.joiningDate || "",
+                      workMode: empRow.work_mode || next.job?.workMode || "",
+                      employeeType: empRow.employee_type || next.job?.employeeType || "",
+                      location: empRow.location || next.job?.location || "",
+                    },
+                  };
+                }
+              }
+
               const cacheKey = PROFILE_CACHE_KEY(userId);
               localStorage.setItem(cacheKey, JSON.stringify(next));
               setProfile(next);
