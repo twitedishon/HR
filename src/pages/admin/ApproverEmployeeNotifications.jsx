@@ -21,22 +21,11 @@ import { supabase } from "../../lib/supabaseClient"; // ✅ adjust path if diffe
 const TABLE = "hrmss_notifications";
 
 const ALLOWED_SOURCES = [
-
-  "Attendance",
   "LeaveManagement",
-  "Payroll",
-  "Documents",
-  "My Profile",
-
 ];
 
 const SOURCE_ROUTE = {
-  Attendance: "/dashboard/attendance",
   LeaveManagement: "/dashboard/leave",
-  Payroll: "/dashboard/payroll",
-  Documents: "/dashboard/documents",
-  "My Profile": "/dashboard/profile",
-
 };
 
 const tone = {
@@ -367,8 +356,7 @@ export default function AdminNotifications() {
             <p className="text-xs uppercase tracking-wider text-white/85">Admin Console</p>
             <h1 className="text-2xl font-bold mt-1">Notifications</h1>
             <p className="text-sm text-white/85 mt-1">
-
-              Shows only: Attendance, LeaveManagement, Payroll, Documents, My Profile.
+              Shows only: LeaveManagement.
             </p>
           </div>
 
@@ -410,10 +398,7 @@ export default function AdminNotifications() {
                 />
               </div>
 
-              <div className="hidden md:flex items-center gap-2">
-                <Filter size={16} className="text-slate-500" />
-                <span className="text-xs text-slate-500">Filters</span>
-              </div>
+
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -445,15 +430,6 @@ export default function AdminNotifications() {
 
           <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setSelected(() => new Set(filtered.map((x) => x.id)))}
-                className="text-xs font-semibold rounded-full border px-3 py-1.5 hover:bg-slate-50"
-              >
-                Select all (filtered)
-              </button>
-              <button onClick={clearSelection} className="text-xs font-semibold rounded-full border px-3 py-1.5 hover:bg-slate-50">
-                Clear
-              </button>
               {selectedCount > 0 ? <span className="text-xs text-slate-500">{selectedCount} selected</span> : null}
             </div>
 

@@ -5,6 +5,10 @@ const ADMIN_NOTIF_TABLE = "hrmss_notifications";
 
 /**
  * Notify an employee about their leave request status change
+ * 
+ * IMPORTANT: For employees signed in via the Employee Sign-In flow (not Supabase Auth),
+ * notifications are stored with user_id = employee_id (e.g., 'EMP-022').
+ * This matches how EmployeeNotifications.jsx fetches notifications.
  */
 export const notifyEmployee = async ({
   ownerId,
@@ -21,29 +25,41 @@ export const notifyEmployee = async ({
   try {
     let userIdToNotify = null;
 
-    // Strategy 1: Try hrmss_profiles by employee_id (for HR/Admin/Manager)
-    const { data: profileByEmpId } = await supabase
-      .from("hrmss_profiles")
-      .select("user_id, email")
-      .eq("employee_id", ownerId)
-      .maybeSingle();
+    // Strategy 1: Check if ownerId looks like an employee_id (e.g., EMP-XXX)
+    // If so, use it directly - this is how EmployeeNotifications.jsx queries
+    const isEmployeeIdFormat = /^EMP-\d+$/i.test(String(ownerId).trim());
 
-    if (profileByEmpId?.user_id) {
-      console.log("notifyEmployee: Found user_id via hrmss_profiles.employee_id:", profileByEmpId.user_id);
-      userIdToNotify = profileByEmpId.user_id;
-    }
-
-    // Strategy 2: Try hrmss_employee_profiles by employee_id (for Employees)
-    if (!userIdToNotify) {
+    if (isEmployeeIdFormat) {
+      // For employee-format IDs, first check if they have a Supabase auth user_id
       const { data: empProfile } = await supabase
         .from("hrmss_employee_profiles")
-        .select("user_id")
+        .select("user_id, employee_id")
         .eq("employee_id", ownerId)
         .maybeSingle();
 
       if (empProfile?.user_id) {
-        console.log("notifyEmployee: Found user_id via hrmss_employee_profiles:", empProfile.user_id);
+        // If employee has a Supabase auth user_id, use it
+        console.log("notifyEmployee: Found auth user_id for employee:", empProfile.user_id);
         userIdToNotify = empProfile.user_id;
+      } else {
+        // If no auth user_id, use the employee_id directly
+        // This is the typical case for Employee Sign-In flow users
+        console.log("notifyEmployee: Employee has no auth user_id, using employee_id directly:", ownerId);
+        userIdToNotify = ownerId;
+      }
+    }
+
+    // Strategy 2: Try hrmss_profiles by employee_id (for HR/Admin/Manager)
+    if (!userIdToNotify) {
+      const { data: profileByEmpId } = await supabase
+        .from("hrmss_profiles")
+        .select("user_id, email")
+        .eq("employee_id", ownerId)
+        .maybeSingle();
+
+      if (profileByEmpId?.user_id) {
+        console.log("notifyEmployee: Found user_id via hrmss_profiles.employee_id:", profileByEmpId.user_id);
+        userIdToNotify = profileByEmpId.user_id;
       }
     }
 
@@ -61,7 +77,7 @@ export const notifyEmployee = async ({
       }
     }
 
-    // Strategy 4: Final fallback - use ownerId directly (might already be a UUID)
+    // Strategy 4: Final fallback - use ownerId directly
     if (!userIdToNotify) {
       console.log("notifyEmployee: Using ownerId as user_id fallback:", ownerId);
       userIdToNotify = ownerId;
