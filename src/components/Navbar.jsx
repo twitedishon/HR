@@ -33,11 +33,16 @@ const Navbar = ({ isSidebarOpen = true, onToggleSidebar }) => {
 
       if (isActive && !error && data) {
         // Filter out HR-related notifications (these should only show for HR users)
+        // Also filter out employee leave approval/rejection notifications
         const filteredCount = data.filter(n => {
           const title = String(n.title || "").toLowerCase();
           const detail = String(n.detail || "").toLowerCase();
           // Exclude HR leave request/approval notifications
           if (title.includes("hr") || detail.includes("hr sent") || detail.includes("hr admin")) {
+            return false;
+          }
+          // Exclude employee leave approval/rejection notifications (they show "Your ... request was approved/rejected")
+          if (detail.includes("your") && (detail.includes("request was approved") || detail.includes("request was rejected") || detail.includes("request was updated"))) {
             return false;
           }
           return true;

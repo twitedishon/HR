@@ -124,18 +124,9 @@ export const notifyEmployee = async ({
       console.log("notifyEmployee: Successfully inserted notification for user:", userIdToNotify);
     }
 
-    // ✅ Also insert to hrmss_notifications for admin/approver users
-    const adminNotificationData = {
-      title: `Leave Request ${status}`,
-      detail: message,
-      type: status === "Approved" ? "success" : status === "Rejected" ? "warning" : "info",
-      source: "LeaveManagement",
-      route: "/dashboard/leave",
-      audience: "admin",
-      unread: true,
-    };
-
-    await supabase.from(ADMIN_NOTIF_TABLE).insert(adminNotificationData);
+    // NOTE: Removed admin notification for employee leave updates
+    // Employee leave request approvals/rejections should only notify the employee,
+    // not appear in the approver employee's notification page
   } catch (error) {
     console.error("Error notifying employee:", error);
   }

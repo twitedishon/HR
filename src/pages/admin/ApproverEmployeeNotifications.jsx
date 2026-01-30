@@ -312,11 +312,16 @@ export default function AdminNotifications() {
       const filteredData = (data || [])
         .filter(n => !dismissedIds.includes(n.id))
         // Exclude HR-related notifications (HR leave requests/approvals should not appear for approver employees)
+        // Also exclude employee leave approval notifications (these should only go to the employee)
         .filter(n => {
           const title = String(n.title || "").toLowerCase();
           const detail = String(n.detail || "").toLowerCase();
           // Skip notifications related to HR leave requests
           if (title.includes("hr") || detail.includes("hr sent") || detail.includes("hr admin")) {
+            return false;
+          }
+          // Skip employee leave approval/rejection notifications (they show "Your ... request was approved/rejected")
+          if (detail.includes("your") && (detail.includes("request was approved") || detail.includes("request was rejected") || detail.includes("request was updated"))) {
             return false;
           }
           return true;
