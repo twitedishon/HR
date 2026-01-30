@@ -437,25 +437,32 @@ const LeaveManagement = () => {
 
         if (error) throw error;
 
-        // 2) Group by applied_at
+        // 2) Group by applied_at and deduplicate recipients
         const groups = new Map();
         (data || []).forEach((r) => {
           const key = `${r.applied_at || ""}_${r.owner_id || ""}_${(r.reason || "").slice(0, 20)}`;
           if (!groups.has(key)) {
-            groups.set(key, { ...r, recipients: [], myRowId: null });
+            groups.set(key, { ...r, recipients: [], myRowId: null, seenRecipientIds: new Set() });
           }
-          const recipient = {
-            id: r.request_to_id,
-            name: r.request_to_name,
-            role: r.request_to_role,
-            status: r.status,
-            rowId: r.id,
-          };
           const target = groups.get(key);
-          target.recipients.push(recipient);
+
+          // Deduplicate recipients by ID to avoid showing same manager twice
+          const recipientId = String(r.request_to_id || "").toLowerCase();
+          if (recipientId && !target.seenRecipientIds.has(recipientId)) {
+            target.seenRecipientIds.add(recipientId);
+            const recipient = {
+              id: r.request_to_id,
+              name: r.request_to_name,
+              role: r.request_to_role,
+              status: r.status,
+              rowId: r.id,
+            };
+            target.recipients.push(recipient);
+          }
+
           if (
             adminId &&
-            String(r.request_to_id || "").toLowerCase() === adminId
+            recipientId === adminId
           ) {
             target.myRowId = r.id;
           }
@@ -524,25 +531,32 @@ const LeaveManagement = () => {
       }
 
 
-      // 2) Group by applied_at
+      // 2) Group by applied_at and deduplicate recipients
       const groups = new Map();
       rows.forEach((r) => {
         const key = `${r.applied_at || ""}_${r.owner_id || ""}_${(r.reason || "").slice(0, 20)}`;
         if (!groups.has(key)) {
-          groups.set(key, { ...r, recipients: [], myRowId: null });
+          groups.set(key, { ...r, recipients: [], myRowId: null, seenRecipientIds: new Set() });
         }
-        const recipient = {
-          id: r.request_to_id,
-          name: r.request_to_name,
-          role: r.request_to_role,
-          status: r.status,
-          rowId: r.id,
-        };
         const target = groups.get(key);
-        target.recipients.push(recipient);
+
+        // Deduplicate recipients by ID to avoid showing same manager twice
+        const recipientId = String(r.request_to_id || "").toLowerCase();
+        if (recipientId && !target.seenRecipientIds.has(recipientId)) {
+          target.seenRecipientIds.add(recipientId);
+          const recipient = {
+            id: r.request_to_id,
+            name: r.request_to_name,
+            role: r.request_to_role,
+            status: r.status,
+            rowId: r.id,
+          };
+          target.recipients.push(recipient);
+        }
+
         if (
           adminId &&
-          String(r.request_to_id || "").toLowerCase() === adminId
+          recipientId === adminId
         ) {
           target.myRowId = r.id;
           target.status = r.status;
@@ -784,17 +798,13 @@ const LeaveManagement = () => {
               ...commonFields,
             };
 
+            // Only send to the approver manager (Arun), not to viewer managers (Sunil)
             const rowsToInsert = [
               {
                 ...commonRequest,
                 request_to_id: approverMgr.id,
                 request_to_name: approverMgr.name,
               },
-              ...viewerMgrs.map((v) => ({
-                ...commonRequest,
-                request_to_id: v.id,
-                request_to_name: v.name,
-              })),
             ];
 
             const { error: mgrError } = await supabase

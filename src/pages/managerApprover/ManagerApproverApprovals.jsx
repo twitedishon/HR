@@ -197,7 +197,18 @@ export default function ManagerApprovals() {
       };
     });
 
-    setRequests(mapped);
+    // Deduplicate by grouping similar requests (same applied_at, ownerId, and reason prefix)
+    const deduped = [];
+    const seenKeys = new Set();
+    for (const r of mapped) {
+      const key = `${r.appliedAt || ""}_${r.ownerId || ""}_${(r.reason || "").slice(0, 20)}`;
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        deduped.push(r);
+      }
+    }
+
+    setRequests(deduped);
     setLoading(false);
   };
 
@@ -237,6 +248,32 @@ export default function ManagerApprovals() {
       .eq("id", rowId);
     if (error) return alert(error.message);
 
+    // ✅ Also update admin_leaves table if this is an admin's leave request
+    // This ensures the approver employee's leave management page shows the correct status
+    const ownerRoleForUpdate = String(requestRecord.ownerRole || "").toLowerCase();
+    if (ownerRoleForUpdate === "admin" && requestRecord.ownerId) {
+      try {
+        const { error: adminLeaveErr } = await supabase
+          .from("admin_leaves")
+          .update({
+            status: nextStatus,
+            decided_at: new Date().toISOString().slice(0, 10),
+            decided_by_name: session.name || "Manager",
+          })
+          .eq("admin_id", requestRecord.ownerId)
+          .eq("from_date", requestRecord.fromDate)
+          .eq("status", "Pending");
+
+        if (adminLeaveErr) {
+          console.warn("admin_leaves update error:", adminLeaveErr);
+        } else {
+          console.log("admin_leaves status updated for:", requestRecord.ownerId);
+        }
+      } catch (e) {
+        console.warn("admin_leaves update failed:", e);
+      }
+    }
+
     try {
       // ✅ Notify based on owner role
       const ownerRole = String(requestRecord.ownerRole || "").toLowerCase();
@@ -248,6 +285,39 @@ export default function ManagerApprovals() {
           status: nextStatus,
           leaveType: requestRecord.leaveType || "Leave Request",
         });
+      } else if (ownerRole === "admin") {
+        // ✅ Notify the approver employee (admin) about the decision
+        // Insert directly to employee_notifications table for the admin user
+        const message =
+          nextStatus === "Approved"
+            ? `Your ${requestRecord.leaveType || "Leave"} request was approved.`
+            : nextStatus === "Rejected"
+              ? `Your ${requestRecord.leaveType || "Leave"} request was rejected.`
+              : `Your ${requestRecord.leaveType || "Leave"} request was updated.`;
+
+        const notificationData = {
+          user_id: requestRecord.ownerId,
+          title: "Leave Request Update",
+          message,
+          type:
+            nextStatus === "Approved"
+              ? "success"
+              : nextStatus === "Rejected"
+                ? "error"
+                : "info",
+          route: "/dashboard/leave",
+          unread: true,
+        };
+
+        const { error: notifErr } = await supabase
+          .from(EMP_NOTIF_TABLE)
+          .insert(notificationData);
+
+        if (notifErr) {
+          console.warn("Admin notification insert error:", notifErr);
+        } else {
+          console.log("Admin employee notification sent to:", requestRecord.ownerId);
+        }
       } else if (ownerRole === "hr") {
         // ✅ Look up HR's email from hrmss_hr_sessions or fallback to ID
         let hrEmail = "";

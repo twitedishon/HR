@@ -123,7 +123,8 @@ const normalizeRequestedTo = (raw) => {
 
 const includesHrRequest = (raw) => {
   const list = normalizeRequestedTo(raw);
-  if (!list.length) return true;
+  // If list is empty or doesn't include HR, return false - don't show on HR page
+  if (!list.length) return false;
   return list.some((v) => String(v).toLowerCase() === "hr");
 };
 
@@ -265,13 +266,22 @@ export default function LeaveManagement() {
       q1 = q1.eq("owner_id", currentHR.id);
     }
 
-    const [r1, r2] = await Promise.all([
+
+    const [r1, r2, r3] = await Promise.all([
       q1,
       // Admin leaves table only relevant when viewing employees (admin-origin leave directed to HR)
       !isHrView
         ? supabase
           .from(ADMIN_LEAVES_TABLE)
           .select("*")
+          .order("applied_at", { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+      // Also fetch admin leave requests from hrmss_leave_requests for correct manager info and status
+      !isHrView
+        ? supabase
+          .from(LEAVES_TABLE)
+          .select("*")
+          .eq("owner_role", "admin")
           .order("applied_at", { ascending: false })
         : Promise.resolve({ data: [], error: null }),
     ]);
@@ -335,9 +345,21 @@ export default function LeaveManagement() {
           ownerId: r.admin_id,
           ownerName: r.admin_name,
 
-          requestToId: currentHR.id,
-          requestToName: currentHR.name,
-          requestToRole: "hr",
+          // Use actual request_to fields from data, or derive from requested_to array
+          // requested_to field contains ["Manager"] or ["HR"] etc.
+          // If request_to_name is set to a manager name, the role should be "manager"
+          requestToId: r.request_to_id || currentHR.id,
+          requestToName: r.request_to_name || currentHR.name,
+          requestToRole: r.request_to_role || (() => {
+            const roles = normalizeRequestedTo(r.requested_to ?? r.request_to ?? r.requestedTo)
+              .map(v => String(v).toLowerCase());
+            // Prioritize manager if present in requested_to
+            if (roles.includes("manager")) return "manager";
+            if (roles.includes("hr")) return "hr";
+            // If request_to_name exists but doesn't match current HR, assume it's a manager
+            if (r.request_to_name && r.request_to_name !== currentHR.name) return "manager";
+            return roles[0] || "hr";
+          })(),
 
           leaveType: r.leave_type,
           mode,
@@ -358,11 +380,60 @@ export default function LeaveManagement() {
         };
       });
 
-    const merged = [...list1, ...list2].sort(
+    // list3: Admin leaves from hrmss_leave_requests with correct manager info and status
+    if (r3.error) console.warn(r3.error.message);
+    const list3 = (r3.data || []).map((r) => {
+      const mode = (r.mode ?? "").toString();
+      const fromDate = r.from_date;
+      const toDate = r.to_date || r.from_date;
+      const tf = shortTime(r.time_from);
+      const tt = shortTime(r.time_to);
+
+      return {
+        id: r.id,
+        ownerRole: r.owner_role || "admin",
+        ownerId: r.owner_id,
+        ownerName: r.owner_name,
+        // These come directly from hrmss_leave_requests - correct manager info
+        requestToId: r.request_to_id,
+        requestToName: r.request_to_name || "",
+        requestToRole: r.request_to_role || "manager",
+        leaveType: r.leave_type,
+        mode,
+        from: fromDate,
+        to: toDate,
+        timeFrom: tf,
+        timeTo: tt,
+        hours: r.hours || (needsTime(mode) ? calcDuration(tf, tt) : null),
+        reason: r.reason,
+        status: r.status, // Correct status from hrmss_leave_requests
+        appliedAt: r.applied_at,
+        decisionNote: r.decision_note || "",
+        decidedAt: r.decided_at || "",
+        decidedBy: r.decided_by_name || "",
+        sourceTable: LEAVES_TABLE,
+      };
+    });
+
+    // Use list3 (admin from hrmss_leave_requests) instead of list2 (from admin_leaves)
+    // list3 has correct manager names and updated status
+    const merged = [...list1, ...list3].sort(
       (a, b) => new Date(b.appliedAt) - new Date(a.appliedAt)
     );
 
-    setRequests(merged);
+    // Deduplicate by grouping similar requests (same applied_at, ownerId, and reason prefix)
+    // This handles old duplicate data created before the fix was applied
+    const deduped = [];
+    const seenKeys = new Set();
+    for (const r of merged) {
+      const key = `${r.appliedAt || ""}_${r.ownerId || ""}_${(r.reason || "").slice(0, 20)}`;
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        deduped.push(r);
+      }
+    }
+
+    setRequests(deduped);
     setLoading(false);
   };
 
