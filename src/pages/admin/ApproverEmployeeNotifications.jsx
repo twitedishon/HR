@@ -282,7 +282,7 @@ export default function AdminNotifications() {
   const fetchNotifications = async () => {
     setLoading(true);
 
-    // Get current user's email from auth session
+    // Get current user's email and ID from auth session
     const authSession = readAuthSession();
     const currentUserEmail = String(
       authSession?.email ||
@@ -290,6 +290,12 @@ export default function AdminNotifications() {
       authSession?.identifier ||
       ""
     ).trim().toLowerCase();
+    const currentUserId = String(
+      authSession?.employee_id ||
+      authSession?.admin_id ||
+      authSession?.id ||
+      ""
+    ).trim();
 
     // Fetch notifications targeted to this specific approver
     let query = supabase
@@ -301,6 +307,9 @@ export default function AdminNotifications() {
 
     const { data, error } = await query;
 
+    // Debug logging
+    console.log("[ApproverEmployeeNotifications] Query result:", { data, error, currentUserId });
+
     if (error) {
       console.error("Notifications fetch error:", error);
       setItems([]);
@@ -311,23 +320,31 @@ export default function AdminNotifications() {
 
       const filteredData = (data || [])
         .filter(n => !dismissedIds.includes(n.id))
-        // Exclude HR-related notifications (HR leave requests/approvals should not appear for approver employees)
-        // Also exclude employee leave approval notifications (these should only go to the employee)
         .filter(n => {
           const title = String(n.title || "").toLowerCase();
           const detail = String(n.detail || "").toLowerCase();
+
+          // ✅ Show admin's own leave approval notifications (marked with [ADMIN-SELF])
+          if (detail.includes("[admin-self]")) {
+            return true;
+          }
+
           // Skip notifications related to HR leave requests
           if (title.includes("hr") || detail.includes("hr sent") || detail.includes("hr admin")) {
             return false;
           }
-          // Skip employee leave approval/rejection notifications (they show "Your ... request was approved/rejected")
+
+          // Skip other employee leave approval/rejection notifications
           if (detail.includes("your") && (detail.includes("request was approved") || detail.includes("request was rejected") || detail.includes("request was updated"))) {
             return false;
           }
+
           return true;
         })
         .map(n => ({
           ...n,
+          // Strip [ADMIN-SELF] marker from detail for display
+          detail: String(n.detail || "").replace(/\[ADMIN-SELF\]\s*/gi, ""),
           // Override unread status with user-specific read state
           unread: readIds.includes(n.id) ? false : n.unread,
         }));

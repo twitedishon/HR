@@ -287,8 +287,8 @@ export default function ManagerApprovals() {
         });
       } else if (ownerRole === "admin") {
         // ✅ Notify the approver employee (admin) about the decision
-        // Insert directly to employee_notifications table for the admin user
-        const message =
+        // Insert to hrmss_notifications table (which ApproverEmployeeNotifications reads from)
+        const detail =
           nextStatus === "Approved"
             ? `Your ${requestRecord.leaveType || "Leave"} request was approved.`
             : nextStatus === "Rejected"
@@ -296,27 +296,31 @@ export default function ManagerApprovals() {
               : `Your ${requestRecord.leaveType || "Leave"} request was updated.`;
 
         const notificationData = {
-          user_id: requestRecord.ownerId,
-          title: "Leave Request Update",
-          message,
+          title: `Leave Request ${nextStatus}`,
+          detail: `[ADMIN-SELF] ${detail}`, // Marker to identify admin's own leave notification
           type:
             nextStatus === "Approved"
               ? "success"
               : nextStatus === "Rejected"
-                ? "error"
+                ? "warning"
                 : "info",
+          source: "LeaveManagement",
           route: "/dashboard/leave",
+          audience: "admin",
           unread: true,
         };
 
-        const { error: notifErr } = await supabase
-          .from(EMP_NOTIF_TABLE)
-          .insert(notificationData);
+        console.log("[ManagerApproverApprovals] Inserting admin notification:", notificationData);
+
+        const { error: notifErr, data: insertedData } = await supabase
+          .from("hrmss_notifications")
+          .insert(notificationData)
+          .select();
 
         if (notifErr) {
-          console.warn("Admin notification insert error:", notifErr);
+          console.warn("[ManagerApproverApprovals] Admin notification insert error:", notifErr);
         } else {
-          console.log("Admin employee notification sent to:", requestRecord.ownerId);
+          console.log("[ManagerApproverApprovals] Admin notification inserted successfully:", insertedData);
         }
       } else if (ownerRole === "hr") {
         // ✅ Look up HR's email from hrmss_hr_sessions or fallback to ID
