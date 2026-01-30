@@ -514,6 +514,7 @@ export default function LeaveManagement() {
       await notifyManagerNewRequest({
         managerId: approverMgr.id,
         managerName: approverMgr.name,
+        managerEmail: approverMgr.email, // ✅ Added for proper targeting
         employeeName: currentHR.name,
         leaveType: applyLeaveType,
         fromDate: applyFrom,

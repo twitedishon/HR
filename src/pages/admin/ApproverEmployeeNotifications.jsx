@@ -294,7 +294,7 @@ export default function AdminNotifications() {
     // Fetch notifications targeted to this specific approver
     let query = supabase
       .from(TABLE)
-      .select("id,title,detail,type,source,route,unread,created_at,target_email")
+      .select("id,title,detail,type,source,route,unread,created_at")
       .in("source", ALLOWED_SOURCES)
       .in("audience", ["admin", "all"])
       .order("created_at", { ascending: false });
@@ -305,17 +305,11 @@ export default function AdminNotifications() {
       console.error("Notifications fetch error:", error);
       setItems([]);
     } else {
-      // ✅ Filter to show only notifications targeted to this specific approver
+      // Note: target_email filtering removed - column not in database schema
       const dismissedIds = getDismissedIds();
       const readIds = getReadIds();
 
       const filteredData = (data || [])
-        .filter(n => {
-          // Only show notifications targeted to this user's email
-          const targetEmail = String(n.target_email || "").trim().toLowerCase();
-          // Show if target_email matches current user, or if target_email is empty (legacy notifications)
-          return !targetEmail || targetEmail === currentUserEmail;
-        })
         .filter(n => !dismissedIds.includes(n.id))
         .map(n => ({
           ...n,

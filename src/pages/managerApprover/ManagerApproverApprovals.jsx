@@ -238,23 +238,42 @@ export default function ManagerApprovals() {
     if (error) return alert(error.message);
 
     try {
-      // Notify the employee about the decision
-      await notifyEmployee({
-        ownerId: requestRecord.ownerId,
-        status: nextStatus,
-        leaveType: requestRecord.leaveType || "Leave Request",
-      });
+      // ✅ Notify based on owner role
+      const ownerRole = String(requestRecord.ownerRole || "").toLowerCase();
 
-      // ✅ Notify HR about the manager's decision
-      await notifyHRAboutDecision({
-        managerName: session.name || "Manager",
-        employeeName: requestRecord.ownerName || "Employee",
-        leaveType: requestRecord.leaveType || "Leave",
-        status: nextStatus,
-        fromDate: requestRecord.fromDate || "",
-        toDate: requestRecord.toDate || "",
-        decisionNote: requestRecord.decisionNote || "",
-      });
+      if (ownerRole === "employee") {
+        // Notify the employee about the decision
+        await notifyEmployee({
+          ownerId: requestRecord.ownerId,
+          status: nextStatus,
+          leaveType: requestRecord.leaveType || "Leave Request",
+        });
+      } else if (ownerRole === "hr") {
+        // ✅ Look up HR's email from hrmss_hr_sessions or fallback to ID
+        let hrEmail = "";
+        try {
+          const { data: hrData } = await supabase
+            .from("hrmss_hr_sessions")
+            .select("email")
+            .eq("employee_id", requestRecord.ownerId)
+            .maybeSingle();
+          hrEmail = hrData?.email || "";
+        } catch {
+          // Ignore lookup errors
+        }
+
+        // Notify the HR who submitted the request
+        await notifyHRAboutDecision({
+          managerName: session.name || "Manager",
+          employeeName: requestRecord.ownerName || "HR",
+          leaveType: requestRecord.leaveType || "Leave",
+          status: nextStatus,
+          fromDate: requestRecord.fromDate || "",
+          toDate: requestRecord.toDate || "",
+          decisionNote: requestRecord.decisionNote || "",
+          requesterEmail: hrEmail, // ✅ Target only the specific HR
+        });
+      }
     } catch (e) {
       console.warn("Notification failed", e);
     }
@@ -262,6 +281,7 @@ export default function ManagerApprovals() {
     // refresh
     await fetchRequests(managerId);
   };
+
 
   return (
     <div className="space-y-4">
@@ -287,8 +307,8 @@ export default function ManagerApprovals() {
 
           <span
             className={`inline-flex items-center gap-1 px-3 py-1 rounded-full font-semibold ${canAct
-                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                : "bg-slate-100 text-slate-600"
+              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+              : "bg-slate-100 text-slate-600"
               }`}
           >
             Role: {canAct ? "Approver" : "View only"}
@@ -399,8 +419,8 @@ export default function ManagerApprovals() {
                     disabled={!canAct || req.status !== "Pending"}
                     onClick={() => handleAction(req.id, "Approved")}
                     className={`rounded-xl px-3 py-2 text-xs font-semibold border ${!canAct || req.status !== "Pending"
-                        ? "bg-slate-100 text-slate-500 cursor-not-allowed"
-                        : "bg-emerald-600 text-white hover:bg-emerald-700"
+                      ? "bg-slate-100 text-slate-500 cursor-not-allowed"
+                      : "bg-emerald-600 text-white hover:bg-emerald-700"
                       }`}
                   >
                     Approve
@@ -410,8 +430,8 @@ export default function ManagerApprovals() {
                     disabled={!canAct || req.status !== "Pending"}
                     onClick={() => handleAction(req.id, "Rejected")}
                     className={`rounded-xl px-3 py-2 text-xs font-semibold border ${!canAct || req.status !== "Pending"
-                        ? "bg-slate-100 text-slate-500 cursor-not-allowed"
-                        : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+                      ? "bg-slate-100 text-slate-500 cursor-not-allowed"
+                      : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
                       }`}
                   >
                     Reject

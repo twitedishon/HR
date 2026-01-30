@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Eye, Pencil, Plus, X, Check } from "lucide-react";
 import { supabase, isSupabaseConfigured } from "../../lib/supabaseClient";
-import { notifyManagerNewRequest } from "../../lib/notificationUtils";
 
 /* ---------------- CONSTANTS ---------------- */
 const LEAVES_TABLE = "hrmss_leave_requests";
@@ -1218,49 +1217,43 @@ export default function EmployeeLeaveManagement() {
     const { error } = await supabase.from(LEAVES_TABLE).insert(rowsToInsert);
     if (error) return alert(error.message);
 
-    // ✅ Notify admins/approvers via hrmss_notifications (used by admin notifications UI)
+    // ✅ Notify approvers via hrmss_notifications
     try {
       const notifRows = rowsToInsert.map((row) => {
-        // Get the approver's email for targeting
+        // Get the approver's info for targeting
         const approver = approverById.get(row.request_to_id);
         const targetEmail = approver?.email || "";
+        const approverRole = String(approver?.role || "admin").toLowerCase();
+
+        // Set audience based on approver's role
+        let audience = "admin";
+        let route = "/dashboard/leave";
+        if (approverRole === "manager") {
+          audience = "manager";
+          route = "/manager-approver-dashboard/approvals";
+        } else if (approverRole === "hr") {
+          audience = "hr";
+          route = "/hr-dashboard/leave";
+        }
 
         return {
           title: "New Leave Request",
           detail: `${EMP.name} submitted a ${row.leave_type} (${row.mode}) request for ${row.from_date}${row.to_date ? ` to ${row.to_date}` : ""}.`,
           type: "info",
           source: "LeaveManagement",
-          route: "/dashboard/leave",
-          audience: "admin",
+          route: route,
+          audience: audience,
           unread: true,
-          target_email: targetEmail, // ✅ Target specific approver
+          // Note: target_email column not available in database schema
         };
       });
 
       await supabase.from("hrmss_notifications").insert(notifRows);
     } catch (notifErr) {
-      console.warn("Admin notification insert failed:", notifErr?.message || notifErr);
+      console.warn("Notification insert failed:", notifErr?.message || notifErr);
       // Do not block the user flow on notification errors
     }
 
-    // ✅ Notify managers about the new leave request
-    try {
-      for (const row of rowsToInsert) {
-        const approver = approverById.get(row.request_to_id);
-        if (approver && (approver.role === "manager" || approver.role === "hr")) {
-          await notifyManagerNewRequest({
-            managerId: approver.id,
-            managerName: approver.name,
-            employeeName: EMP.name,
-            leaveType: row.leave_type,
-            fromDate: row.from_date,
-            toDate: row.to_date,
-          });
-        }
-      }
-    } catch (mgrNotifErr) {
-      console.warn("Manager notification failed:", mgrNotifErr?.message || mgrNotifErr);
-    }
 
     setCreateOpen(false);
     setCRequestToIds([]);

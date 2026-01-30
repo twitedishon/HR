@@ -42,8 +42,18 @@ const SOURCE_ROUTE = {
 };
 
 // ✅ User-specific localStorage keys for HR
+const AUTH_KEY = "HRMSS_AUTH_SESSION";
 const DISMISSED_KEY = "hrmss.notifications.dismissed.hr";
 const READ_KEY = "hrmss.notifications.read.hr";
+
+function readAuthSession() {
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 function getDismissedIds() {
   try {
@@ -363,6 +373,16 @@ export default function HrNotifications() {
       const { data: authData } = await supabase.auth.getUser();
       const userId = authData?.user?.id || null;
 
+      // ✅ Get current HR's email for filtering
+      const authSession = readAuthSession();
+      const currentUserEmail = String(
+        authSession?.email ||
+        authSession?.official_email ||
+        authSession?.identifier ||
+        ""
+      ).trim().toLowerCase();
+
+
       const [adminRes, personalRes] = await Promise.all([
         supabase
           .from(TABLE)
@@ -387,6 +407,7 @@ export default function HrNotifications() {
       if (adminError) console.error("Notifications fetch error (admin table):", adminError);
       if (personalError) console.error("Notifications fetch error (employee table):", personalError);
 
+      // Note: target_email filtering removed - column not in database schema
       const mapped = [
         ...adminData.map((n) => ({
           id: `g-${n.id}`,

@@ -193,7 +193,7 @@ export const notifyManagerNewRequest = async ({
       route: "/manager-approver-dashboard/approvals",
       audience: "manager",
       unread: true,
-      target_email: managerEmail || manager?.email || "", // ✅ Target specific manager
+      // Note: target_email column not available in database schema
     };
 
     const { error: notifError } = await supabase
@@ -222,6 +222,7 @@ export const notifyHRAboutDecision = async ({
   fromDate,
   toDate,
   decisionNote = "",
+  requesterEmail = "", // ✅ Added for targeting specific requester
 }) => {
   if (!managerName || !status) return;
 
@@ -242,6 +243,7 @@ export const notifyHRAboutDecision = async ({
       route: "/hr-dashboard/leave",
       audience: "hr",
       unread: true,
+      // Note: target_email column not available in database schema
     };
 
     const { error: notifError } = await supabase
@@ -257,3 +259,4 @@ export const notifyHRAboutDecision = async ({
     console.error("Error notifying HR:", error);
   }
 };
+
