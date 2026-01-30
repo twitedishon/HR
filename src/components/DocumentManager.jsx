@@ -488,9 +488,21 @@ export default function DocumentManager({
         const legacyEmployeeSignin = readLegacyEmployeeSignin();
         const empId = resolveEmployeeId({ authCache, legacyEmployeeSignin });
 
-        const queryUserId = (normalizedPageRole === "employee" && empId) ? empId : authed.id;
+        // ✅ Special case: Approver employee should query with empId like employees
+        const approverEmail = authCache?.email || authCache?.official_email || authCache?.identifier || "";
+        const isApproverEmployee = normalizedPageRole === "admin" &&
+          String(approverEmail).trim().toLowerCase() === "haripriya@twite.ai";
+        const treatAsEmployee = normalizedPageRole === "employee" || isApproverEmployee;
+
+        // Use empId for employees and approver employee, otherwise use authed.id
+        const queryUserId = (treatAsEmployee && empId) ? empId : authed.id;
+        console.log("[DocumentManager] Query user_id:", queryUserId, "role:", normalizedPageRole, "empId:", empId, "isApproverEmployee:", isApproverEmployee);
+
         q = q.eq("user_id", queryUserId);
-        if (normalizedPageRole) q = q.eq("role", normalizedPageRole);
+
+        // For approver employee, query as 'employee' role since that's how documents were saved
+        const queryRole = isApproverEmployee ? "employee" : normalizedPageRole;
+        if (queryRole) q = q.eq("role", queryRole);
       }
 
       const { data, error } = await q;
