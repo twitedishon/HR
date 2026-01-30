@@ -734,7 +734,14 @@ export default function ManagerDashboard() {
   );
 
   const LeaveView = () => {
-    const todayList = leaveRequests.filter(shouldShowOnLeave);
+    // Deduplicate leave requests by ID to prevent showing the same leave twice
+    const seenIds = new Set();
+    const todayList = leaveRequests.filter((leave) => {
+      if (!shouldShowOnLeave(leave)) return false;
+      if (seenIds.has(leave.id)) return false;
+      seenIds.add(leave.id);
+      return true;
+    });
 
     return (
       <div className="space-y-4">

@@ -501,9 +501,9 @@ export default function LeaveManagement() {
       status: "Pending",
     };
 
+    // Only send HR leave requests to the approver manager (Arun), not to viewer managers (Sunil)
     const rowsToInsert = [
       { ...common, request_to_id: approverMgr.id, request_to_name: approverMgr.name },
-      ...viewerMgrs.map((v) => ({ ...common, request_to_id: v.id, request_to_name: v.name })),
     ];
 
     const { error } = await supabase.from(LEAVES_TABLE).insert(rowsToInsert);

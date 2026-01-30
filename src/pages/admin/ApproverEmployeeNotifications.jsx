@@ -311,6 +311,16 @@ export default function AdminNotifications() {
 
       const filteredData = (data || [])
         .filter(n => !dismissedIds.includes(n.id))
+        // Exclude HR-related notifications (HR leave requests/approvals should not appear for approver employees)
+        .filter(n => {
+          const title = String(n.title || "").toLowerCase();
+          const detail = String(n.detail || "").toLowerCase();
+          // Skip notifications related to HR leave requests
+          if (title.includes("hr") || detail.includes("hr sent") || detail.includes("hr admin")) {
+            return false;
+          }
+          return true;
+        })
         .map(n => ({
           ...n,
           // Override unread status with user-specific read state
