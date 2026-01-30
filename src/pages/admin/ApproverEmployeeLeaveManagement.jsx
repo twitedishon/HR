@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertCircle } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import { formatDDMMYYYY, formatTimeHHMM } from "../../lib/dateUtils";
-import { notifyManagerNewRequest } from "../../lib/notificationUtils";
+import { notifyManagerNewRequest, notifyEmployee } from "../../lib/notificationUtils";
 
 /* ---------------- STORAGE HELPERS ---------------- */
 const safeJson = (v) => {
@@ -673,6 +673,22 @@ const LeaveManagement = () => {
         .eq("id", targetId);
 
       if (error) throw error;
+
+      // ✅ Notify the employee who submitted the leave request
+      const ownerRole = String(viewing.ownerRole || "").toLowerCase();
+      if (ownerRole === "employee") {
+        try {
+          await notifyEmployee({
+            ownerId: viewing.ownerId,
+            status: nextStatus,
+            leaveType: viewing.leaveType || "Leave Request",
+          });
+          console.log("[ApproverEmployeeLeaveManagement] Notified employee:", viewing.ownerId);
+        } catch (notifErr) {
+          console.warn("[ApproverEmployeeLeaveManagement] Failed to notify employee:", notifErr);
+        }
+      }
+
       setViewing((prev) => (prev ? { ...prev, status: nextStatus } : prev));
       fetchRequests(mode);
     } catch (err) {

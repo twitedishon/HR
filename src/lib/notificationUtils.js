@@ -112,16 +112,17 @@ export const notifyEmployee = async ({
       unread: true,
     };
 
-    console.log("notifyEmployee: Inserting notification:", JSON.stringify(notificationData));
+    console.log("notifyEmployee: Inserting notification with user_id:", userIdToNotify, "data:", JSON.stringify(notificationData));
 
-    const { error: notifError } = await supabase
+    const { error: notifError, data: insertedData } = await supabase
       .from(EMP_NOTIF_TABLE)
-      .insert(notificationData);
+      .insert(notificationData)
+      .select();
 
     if (notifError) {
       console.error("notifyEmployee: Insert error:", notifError);
     } else {
-      console.log("notifyEmployee: Successfully inserted notification for user:", userIdToNotify);
+      console.log("notifyEmployee: Successfully inserted notification, result:", insertedData);
     }
 
     // NOTE: Removed admin notification for employee leave updates
