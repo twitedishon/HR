@@ -706,27 +706,62 @@ export default function DocumentManager({
   };
 
   /* ---------- VIEW / DOWNLOAD ---------- */
-  const openSignedUrl = async (doc, mode = "view") => {
+  const openSignedUrl = async (doc, actionMode = "view") => {
     try {
       setErrMsg("");
       setBusy(true);
 
+      // For local/offline documents
       if (doc?.localDataUrl) {
-        window.open(doc.localDataUrl, "_blank", "noopener,noreferrer");
+        if (actionMode === "download") {
+          // Download offline document
+          const link = document.createElement("a");
+          link.href = doc.localDataUrl;
+          link.download = doc.fileName || doc.title || "document";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } else {
+          // View offline document
+          window.open(doc.localDataUrl, "_blank", "noopener,noreferrer");
+        }
         return;
       }
 
       const user = await getAuthedUser();
       must(user?.id, "Please login (Supabase Auth) to access documents.");
 
+      console.log("[DocumentManager] openSignedUrl called with actionMode:", actionMode, "doc:", doc.title);
+
+      // Generate signed URL - for download, include download option
+      // For view, explicitly do NOT set download option
+      const signedUrlOptions = actionMode === "download"
+        ? { download: doc.fileName || doc.title || "document" }
+        : { download: false }; // Explicitly disable download for view mode
+
       const { data, error } = await supabase.storage
         .from(doc.bucket || BUCKET)
-        .createSignedUrl(doc.storagePath, 60 * 10);
+        .createSignedUrl(doc.storagePath, 60 * 10, signedUrlOptions);
 
       if (error) throw error;
       const url = data?.signedUrl;
       must(url, "Failed to generate URL");
-      window.open(url, "_blank", "noopener,noreferrer");
+
+      console.log("[DocumentManager] Generated signed URL for", actionMode, ":", url?.substring(0, 100) + "...");
+
+      if (actionMode === "download") {
+        // Trigger download via anchor element
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = doc.fileName || doc.title || "document";
+        link.target = "_blank";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        // View in new tab - just open the URL, browser will display based on Content-Type
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
     } catch (e) {
       console.error("signed url error:", e);
       setErrMsg(getDocumentErrorMessage(e, "Failed to open file"));
@@ -831,7 +866,8 @@ export default function DocumentManager({
         <div className="flex justify-end gap-2">
           <button
             type="button"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               setSelectedDoc(d);
               setSelectedAction("approved");
               setNoteModalOpen(true);
@@ -844,7 +880,8 @@ export default function DocumentManager({
           </button>
           <button
             type="button"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               setSelectedDoc(d);
               setSelectedAction("rejected");
               setNoteModalOpen(true);
@@ -857,7 +894,10 @@ export default function DocumentManager({
           </button>
           <button
             type="button"
-            onClick={() => openSignedUrl(d, "view")}
+            onClick={(e) => {
+              e.stopPropagation();
+              openSignedUrl(d, "view");
+            }}
             className="hover:opacity-80"
             title="View"
             disabled={busy}
@@ -866,7 +906,10 @@ export default function DocumentManager({
           </button>
           <button
             type="button"
-            onClick={() => openSignedUrl(d, "download")}
+            onClick={(e) => {
+              e.stopPropagation();
+              openSignedUrl(d, "download");
+            }}
             className="hover:opacity-80"
             title="Download"
             disabled={busy}
@@ -879,14 +922,41 @@ export default function DocumentManager({
 
     return (
       <div className="flex justify-end gap-3">
-        <button type="button" onClick={() => openSignedUrl(d, "view")} className="hover:opacity-80" title="View" disabled={busy}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            openSignedUrl(d, "view");
+          }}
+          className="hover:opacity-80"
+          title="View"
+          disabled={busy}
+        >
           <Eye size={16} />
         </button>
-        <button type="button" onClick={() => openSignedUrl(d, "download")} className="hover:opacity-80" title="Download" disabled={busy}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            openSignedUrl(d, "download");
+          }}
+          className="hover:opacity-80"
+          title="Download"
+          disabled={busy}
+        >
           <Download size={16} />
         </button>
         {d.status === "pending" && (
-          <button type="button" onClick={() => remove(d)} className="hover:opacity-80" title="Delete" disabled={busy}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              remove(d);
+            }}
+            className="hover:opacity-80"
+            title="Delete"
+            disabled={busy}
+          >
             <Trash2 size={16} className="text-rose-600" />
           </button>
         )}

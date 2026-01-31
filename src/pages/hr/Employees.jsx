@@ -228,8 +228,8 @@ export default function Employees() {
       workLocations.includes("Other") && otherWorkLocation?.trim()
         ? [`Other: ${otherWorkLocation.trim()}`]
         : workLocations.includes("Other")
-        ? ["Other"]
-        : [];
+          ? ["Other"]
+          : [];
     return [...base, ...other].join(", ");
   };
 
@@ -405,8 +405,8 @@ export default function Employees() {
         employeeTypeFilter === "All"
           ? true
           : employeeTypeFilter === "Intern"
-          ? currentType.toLowerCase().startsWith("intern")
-          : emp.employeeType === employeeTypeFilter;
+            ? currentType.toLowerCase().startsWith("intern")
+            : emp.employeeType === employeeTypeFilter;
 
       return matchSearch && matchDepartment && matchEmployeeType;
     });
@@ -420,8 +420,8 @@ export default function Employees() {
 
     const fields = [
       { label: "Status", value: e.status },
-      { label: "Department", value: e.department },
-      { label: "Role", value: e.role },
+      { label: "Designation", value: e.department },
+      { label: "Team", value: e.role },
       { label: "Employee Type", value: e.employeeType },
       { label: "Gender", value: e.gender },
       { label: "Join Date", value: formatJoinDate(e.joinDate) },
@@ -468,7 +468,7 @@ export default function Employees() {
           onChange={(e) => setDepartmentFilter(e.target.value)}
           className="rounded-lg border px-3 py-2 text-sm"
         >
-          <option value="All">All departments</option>
+          <option value="All">All Designation</option>
           {DEPARTMENTS.map((d) => (
             <option key={d} value={d}>
               {d}
@@ -499,10 +499,10 @@ export default function Employees() {
                 Employee
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold">
-                Department
+                Designation
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold">
-                Role
+                Team
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold">
                 Work Location
@@ -690,7 +690,7 @@ export default function Employees() {
                 onChange={handleChange}
                 className="rounded border px-3 py-2"
               >
-                <option value="">Select Department *</option>
+                <option value="">Select Designation *</option>
                 {DEPARTMENTS.map((d) => (
                   <option key={d} value={d}>
                     {d}
@@ -702,7 +702,7 @@ export default function Employees() {
                 name="role"
                 value={newEmployee.role}
                 onChange={handleChange}
-                placeholder="Role / Designation"
+                placeholder="Team"
                 className="rounded border px-3 py-2"
               />
 
