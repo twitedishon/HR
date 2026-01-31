@@ -46,6 +46,20 @@ const formatDateValue = (value) => {
   return formatted === "-" ? raw : formatted;
 };
 
+// Convert YYYY-MM to MM/YYYY format
+const formatMonthYear = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw || raw === "-") return "-";
+  // Check if it's already in MM/YYYY format
+  if (/^\d{2}\/\d{4}$/.test(raw)) return raw;
+  // Convert from YYYY-MM to MM/YYYY
+  const match = raw.match(/^(\d{4})-(\d{2})$/);
+  if (match) {
+    return `${match[2]}/${match[1]}`;
+  }
+  return raw;
+};
+
 function numberToWords(n) {
   const ones = [
     "Zero",
@@ -131,7 +145,7 @@ function PayslipPreviewModal({ open, onClose, slip }) {
   const earningsTotal = earnings.reduce((s, [, v]) => s + Number(v || 0), 0);
   const deductionsTotal = deductions.reduce((s, [, v]) => s + Number(v || 0), 0);
   const netPay = Math.max(0, Number(slip.net || earningsTotal - deductionsTotal));
-  const monthYear = slip.month || "-";
+  const monthYear = formatMonthYear(slip.month);
 
   return (
     <div className="fixed inset-0 z-[60] bg-black/50 p-4 sm:p-8 overflow-y-auto">
@@ -330,7 +344,7 @@ function PayslipPreviewModal({ open, onClose, slip }) {
                 </div>
               </div>
 
-              
+
             </div>
           </div>
         </div>
@@ -590,17 +604,16 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
                         <div>
                           <p className="text-sm font-semibold text-slate-900">{row.name}</p>
                           <p className="text-xs text-slate-500">
-                            {row.employeeId} • {row.month}
+                            {row.employeeId} • {formatMonthYear(row.month)}
                           </p>
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-extrabold text-slate-900">{money(row.net)}</p>
                           <span
-                            className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                              row.sent
-                                ? "bg-emerald-50 text-emerald-700"
-                                : "bg-amber-50 text-amber-700"
-                            }`}
+                            className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${row.sent
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-amber-50 text-amber-700"
+                              }`}
                           >
                             {row.sent ? "Sent" : "Pending"}
                           </span>
@@ -622,7 +635,7 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
                         <div>
                           <p className="text-sm font-semibold text-slate-900">{row.name}</p>
                           <p className="text-xs text-slate-500">
-                            {row.employeeId} • {row.month}
+                            {row.employeeId} • {formatMonthYear(row.month)}
                           </p>
                         </div>
                         <p className="text-sm font-extrabold text-emerald-700">{money(row.net)}</p>
@@ -641,7 +654,7 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {monthSummary.map((m) => (
                     <div key={m.month} className="rounded-2xl border bg-white px-4 py-3">
-                      <p className="text-sm font-extrabold text-slate-900">{m.month}</p>
+                      <p className="text-sm font-extrabold text-slate-900">{formatMonthYear(m.month)}</p>
                       <p className="mt-1 text-xs text-slate-500">
                         {m.total} payslip{m.total === 1 ? "" : "s"} • {m.sent} sent
                       </p>
@@ -667,7 +680,7 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
                         <div>
                           <p className="text-sm font-semibold text-slate-900">{row.name}</p>
                           <p className="text-xs text-slate-500">
-                            {row.employeeId} • {row.month}
+                            {row.employeeId} • {formatMonthYear(row.month)}
                           </p>
                         </div>
                         <p className="text-sm font-extrabold text-slate-900">{money(row.net)}</p>
@@ -768,13 +781,13 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
               <option value="all">All Months</option>
               {months.map((m) => (
                 <option key={m} value={m}>
-                  {m}
+                  {formatMonthYear(m)}
                 </option>
               ))}
             </select>
           </div>
 
-          
+
         </div>
 
         <div className="mt-4 overflow-hidden rounded-2xl border">
@@ -793,9 +806,8 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
               {filtered.map((row) => (
                 <div
                   key={row.id}
-                  className={`grid grid-cols-1 gap-3 px-4 py-3 transition md:grid-cols-12 md:items-center ${
-                    row.id === selectedId ? "bg-indigo-50" : "bg-white hover:bg-slate-50"
-                  }`}
+                  className={`grid grid-cols-1 gap-3 px-4 py-3 transition md:grid-cols-12 md:items-center ${row.id === selectedId ? "bg-indigo-50" : "bg-white hover:bg-slate-50"
+                    }`}
                   onClick={() => setSelectedId(row.id)}
                   role="button"
                   tabIndex={0}
@@ -807,7 +819,7 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
                     </p>
                   </div>
                   <div className="md:col-span-2 text-sm font-semibold text-slate-700">{row.dept}</div>
-                  <div className="md:col-span-2 text-sm font-semibold text-slate-700">{row.month}</div>
+                  <div className="md:col-span-2 text-sm font-semibold text-slate-700">{formatMonthYear(row.month)}</div>
                   <div className="md:col-span-2 text-right text-sm font-extrabold text-slate-900">
                     {money(row.net)}
                   </div>
@@ -853,7 +865,7 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
                 <div>
                   <p className="text-xs font-semibold text-slate-500 uppercase">Selected Payslip</p>
                   <p className="text-lg font-extrabold text-slate-900">
-                    {selected.name} | {selected.month}
+                    {selected.name} | {formatMonthYear(selected.month)}
                   </p>
                   <p className="text-sm text-slate-600">{selected.dept}</p>
                 </div>
@@ -911,7 +923,7 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
                 </div>
               </div>
 
-             
+
 
               <div className="grid grid-cols-1 gap-3">
                 <button
@@ -938,7 +950,7 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
                 </button>
               </div>
 
-              
+
             </div>
           </div>
         ) : null}

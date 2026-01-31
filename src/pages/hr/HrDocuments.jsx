@@ -4,7 +4,7 @@ import { supabase } from "../../lib/supabaseClient";
 
 const tabs = [
   { key: "uploads", label: "HR Uploads" },
-  { key: "approvals", label: "Employee Approvals" },
+  { key: "approvals", label: "Team Approval" },
 ];
 
 export default function HrDocuments() {
@@ -34,9 +34,8 @@ export default function HrDocuments() {
             <button
               key={t.key}
               onClick={() => setActive(t.key)}
-              className={`px-4 py-2 rounded-full border text-sm font-semibold transition ${
-                activeTab ? "bg-purple-700 text-white border-purple-700" : "bg-white text-slate-700 hover:bg-slate-50"
-              }`}
+              className={`px-4 py-2 rounded-full border text-sm font-semibold transition ${activeTab ? "bg-purple-700 text-white border-purple-700" : "bg-white text-slate-700 hover:bg-slate-50"
+                }`}
               type="button"
             >
               {t.label}
@@ -65,7 +64,7 @@ export default function HrDocuments() {
         />
       ) : (
         <DocumentManager
-          title="Employee Approvals"
+          title="Team Approval"
           subtitle="Review and approve employee documents"
           accent="purple"
           role="hr"
