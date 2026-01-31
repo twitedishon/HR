@@ -36,10 +36,13 @@ const currentHR = getHRFromStorage();
 const leaveTypes = [
   "Casual Leave",
   "Sick Leave",
-  "Annual Leave",
-  "Work From Home",
+  "Maternity/Paternity",
   "Paid Leave",
-  "Other",
+  "Work from home",
+  "Holidays",
+  "Permissions",
+  "Special Leave",
+  "Bereavement Leave",
 ];
 
 const leaveModes = ["Full Day", "Half Day", "Permission"];
@@ -625,7 +628,7 @@ export default function LeaveManagement() {
                 : "text-gray-700 hover:bg-gray-50"
                 }`}
             >
-              Employee
+              Team
             </button>
             <button
               type="button"

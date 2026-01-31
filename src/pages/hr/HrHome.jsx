@@ -69,7 +69,7 @@ const typePill = (type) => {
   return `${pillBase} bg-violet-50 text-violet-700 border-violet-200`;
 };
 
-const TAB_VALUES = new Set(["all", "admins", "employees"]);
+const TAB_VALUES = new Set(["all", "ta_team", "tech_team", "bd_team"]);
 
 const SortIcon = ({ active, dir }) => {
   if (!active) return <ArrowUpDown size={14} className="opacity-70" />;
@@ -84,19 +84,17 @@ const SegButton = ({ active, onClick, icon: Icon, label }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`group inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-sm font-semibold border transition-all ${
-      active
-        ? "bg-slate-900 text-white border-slate-900 shadow"
-        : "bg-white/70 text-slate-700 border-slate-200 hover:bg-white hover:shadow-sm"
-    }`}
+    className={`group inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-sm font-semibold border transition-all ${active
+      ? "bg-slate-900 text-white border-slate-900 shadow"
+      : "bg-white/70 text-slate-700 border-slate-200 hover:bg-white hover:shadow-sm"
+      }`}
   >
     {Icon ? (
       <span
-        className={`p-1.5 rounded-xl border transition ${
-          active
-            ? "bg-white/10 border-white/15"
-            : "bg-slate-50 border-slate-200 group-hover:bg-white"
-        }`}
+        className={`p-1.5 rounded-xl border transition ${active
+          ? "bg-white/10 border-white/15"
+          : "bg-slate-50 border-slate-200 group-hover:bg-white"
+          }`}
       >
         <Icon size={16} />
       </span>
@@ -169,11 +167,10 @@ const ModalTabBtn = ({ active, onClick, icon: Icon, label }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`inline-flex items-center gap-2 px-3 py-2 rounded-2xl text-sm font-semibold border transition ${
-      active
-        ? "bg-slate-900 text-white border-slate-900 shadow"
-        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-    }`}
+    className={`inline-flex items-center gap-2 px-3 py-2 rounded-2xl text-sm font-semibold border transition ${active
+      ? "bg-slate-900 text-white border-slate-900 shadow"
+      : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+      }`}
   >
     {Icon ? <Icon size={16} /> : null}
     {label}
@@ -322,19 +319,19 @@ export default function HrHome() {
         const mappedAdmins = adminRes.error
           ? []
           : (adminRes.data || [])
-              .map((row) => ({
-                type: "admin",
-                id: row.employee_id || row.user_id || "",
-                userId: row.user_id || "",
-                name: row.full_name || "",
-                email: row.official_email || row.personal_email || "",
-                phone: row.mobile_number || "",
-                role: row.designation || row.role || "Admin",
-                department: row.department || "",
-                joinedOn: row.created_at || "",
-                location: row.location || "",
-              }))
-              .filter((row) => row.id);
+            .map((row) => ({
+              type: "admin",
+              id: row.employee_id || row.user_id || "",
+              userId: row.user_id || "",
+              name: row.full_name || "",
+              email: row.official_email || row.personal_email || "",
+              phone: row.mobile_number || "",
+              role: row.designation || row.role || "Admin",
+              department: row.department || "",
+              joinedOn: row.created_at || "",
+              location: row.location || "",
+            }))
+            .filter((row) => row.id);
 
         if (!mounted) return;
         setEmployees(mappedEmployees);
@@ -363,8 +360,32 @@ export default function HrHome() {
   const filtered = useMemo(() => {
     let list = [...combined];
 
-    if (tab === "employees") list = list.filter((x) => x.type === "employee");
-    if (tab === "admins") list = list.filter((x) => x.type === "admin");
+    // TA Team: Talent Acquisition Manager, Talent Acquisition Executive
+    if (tab === "ta_team") {
+      list = list.filter((x) => {
+        const dept = safeLower(x.department);
+        return dept === "talent acquisition manager" || dept === "talent acquisition executive";
+      });
+    }
+    // Tech Team: AI Engineer, AI Intern, UI/UX Intern, Software Developer Intern
+    if (tab === "tech_team") {
+      list = list.filter((x) => {
+        const dept = safeLower(x.department);
+        return (
+          dept === "ai engineer" ||
+          dept === "ai intern" ||
+          dept === "ui/ux intern" ||
+          dept === "software developer intern"
+        );
+      });
+    }
+    // BD Team: Business Development Executive
+    if (tab === "bd_team") {
+      list = list.filter((x) => {
+        const dept = safeLower(x.department);
+        return dept === "business development executive";
+      });
+    }
 
     const q = search.trim().toLowerCase();
     if (q) {
@@ -540,8 +561,9 @@ export default function HrHome() {
       {/* TABS */}
       <div className="flex flex-wrap items-center gap-2">
         <SegButton active={tab === "all"} onClick={() => setTab("all")} icon={Sparkles} label="All Users" />
-        <SegButton active={tab === "admins"} onClick={() => setTab("admins")} icon={Shield} label="Admins" />
-        <SegButton active={tab === "employees"} onClick={() => setTab("employees")} icon={Users} label="Employees" />
+        <SegButton active={tab === "ta_team"} onClick={() => setTab("ta_team")} icon={Users} label="TA Team" />
+        <SegButton active={tab === "tech_team"} onClick={() => setTab("tech_team")} icon={Users} label="Tech Team" />
+        <SegButton active={tab === "bd_team"} onClick={() => setTab("bd_team")} icon={Users} label="BD Team" />
       </div>
 
       {/* TABLE */}
@@ -613,11 +635,10 @@ export default function HrHome() {
                       <div className="flex items-center gap-3">
                         <div className="relative w-11 h-11 rounded-2xl border bg-white overflow-hidden shadow-sm">
                           <div
-                            className={`absolute inset-0 ${
-                              u.type === "employee"
-                                ? "bg-gradient-to-br from-emerald-500/25 to-cyan-500/25"
-                                : "bg-gradient-to-br from-violet-500/25 to-indigo-500/25"
-                            }`}
+                            className={`absolute inset-0 ${u.type === "employee"
+                              ? "bg-gradient-to-br from-emerald-500/25 to-cyan-500/25"
+                              : "bg-gradient-to-br from-violet-500/25 to-indigo-500/25"
+                              }`}
                           />
                           <div className="relative h-full w-full flex items-center justify-center">
                             <span className="text-xs font-extrabold text-slate-800">{initials(u.name)}</span>
@@ -680,13 +701,7 @@ export default function HrHome() {
           </table>
         </div>
 
-        <div className="px-4 sm:px-6 py-4 border-t text-xs text-slate-500 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            Sort: <span className="font-semibold text-slate-700">{sortKey}</span> •{" "}
-            <span className="font-semibold text-slate-700">{sortDir}</span>
-          </div>
-          
-        </div>
+
       </div>
 
       {/* PROFILE MODAL */}
@@ -740,11 +755,10 @@ export default function HrHome() {
                   <div className="flex items-center gap-3">
                     <div className="relative w-11 h-11 rounded-2xl border bg-white overflow-hidden shadow-sm">
                       <div
-                        className={`absolute inset-0 ${
-                          viewing.type === "employee"
-                            ? "bg-gradient-to-br from-emerald-500/25 to-indigo-500/25"
-                            : "bg-gradient-to-br from-violet-500/25 to-indigo-500/25"
-                        }`}
+                        className={`absolute inset-0 ${viewing.type === "employee"
+                          ? "bg-gradient-to-br from-emerald-500/25 to-indigo-500/25"
+                          : "bg-gradient-to-br from-violet-500/25 to-indigo-500/25"
+                          }`}
                       />
                       <div className="relative h-full w-full flex items-center justify-center">
                         <span className="text-sm font-extrabold text-slate-900">{initials(viewing.name)}</span>
