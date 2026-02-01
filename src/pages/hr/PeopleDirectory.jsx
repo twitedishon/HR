@@ -436,11 +436,6 @@ export default function PeopleDirectory() {
                   value={selected?.dob ? fmtDateLong(selected.dob) : "-"}
                 />
                 <DetailRow
-                  icon={<CalendarCheck2 size={18} />}
-                  label="JOINED"
-                  value={selected?.joined ? fmtDateLong(selected.joined) : "-"}
-                />
-                <DetailRow
                   icon={<Mail size={18} />}
                   label="EMAIL"
                   value={selected?.email}
