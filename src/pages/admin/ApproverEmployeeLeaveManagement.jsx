@@ -1090,8 +1090,13 @@ const LeaveManagement = () => {
                 >
                   <option>Casual Leave</option>
                   <option>Sick Leave</option>
-                  <option>Annual Leave</option>
+                  <option>Maternity/Paternity</option>
                   <option>Paid Leave</option>
+                  <option>Work from home</option>
+                  <option>Holidays</option>
+                  <option>Permissions</option>
+                  <option>Special Leave</option>
+                  <option>Bereavement Leave</option>
                 </select>
 
                 <select
