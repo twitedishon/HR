@@ -915,7 +915,7 @@ const LeaveManagement = () => {
     return (
       <section className="space-y-4">
         <div className="bg-white border rounded-2xl p-6">
-          <h1 className="text-2xl font-semibold">Leave Letters</h1>
+          <h1 className="text-2xl font-semibold">Leave </h1>
           <p className="text-sm text-gray-600 mt-2">
             {mode === "employee"
               ? "Employee session not found. Please login as Employee."
@@ -967,7 +967,7 @@ const LeaveManagement = () => {
       {/* Header + Toggle + Apply button */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Leave Letters</h1>
+          <h1 className="text-2xl font-semibold">Leave Management</h1>
           <p className="text-sm text-gray-600">
             {mode === "employee"
               ? currentAdmin?.id
@@ -993,7 +993,7 @@ const LeaveManagement = () => {
               className={`px-6 py-2 rounded-lg text-sm font-medium transition ${mode === "employee" ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-50"
                 }`}
             >
-              Employee
+              Team
             </button>
 
             <button

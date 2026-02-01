@@ -154,7 +154,53 @@ function fmtDate(d) {
 
 const fmtOrDash = (value) => (value ? String(value) : "-");
 
-const ADMIN_EMPLOYEE_ID = "EMP-001"; // Hari Priya's employee ID
+// Convert date range "2024-02-26 - 2026-01-29" to "X years Y months" format
+const formatExperienceDuration = (value) => {
+  if (!value) return "-";
+  const str = String(value).trim();
+
+  // Check if it's already in "X years" or "X months" format
+  if (str.toLowerCase().includes("year") || str.toLowerCase().includes("month")) {
+    return str;
+  }
+
+  // Parse date range format: "YYYY-MM-DD - YYYY-MM-DD" or "YYYY-MM-DD - Present"
+  const parts = str.split(" - ");
+  if (parts.length !== 2) return str;
+
+  const fromDate = new Date(parts[0].trim());
+  let toDate;
+
+  if (parts[1].trim().toLowerCase() === "present") {
+    toDate = new Date();
+  } else {
+    toDate = new Date(parts[1].trim());
+  }
+
+  if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+    return str;
+  }
+
+  // Calculate difference in months
+  let months = (toDate.getFullYear() - fromDate.getFullYear()) * 12;
+  months += toDate.getMonth() - fromDate.getMonth();
+
+  if (months < 0) months = 0;
+
+  const years = Math.floor(months / 12);
+  const remainingMonths = months % 12;
+
+  if (years === 0 && remainingMonths === 0) {
+    return "Less than 1 month";
+  }
+
+  const yearText = years > 0 ? `${years} year${years > 1 ? "s" : ""}` : "";
+  const monthText = remainingMonths > 0 ? `${remainingMonths} month${remainingMonths > 1 ? "s" : ""}` : "";
+
+  return [yearText, monthText].filter(Boolean).join(" ");
+};
+
+const ADMIN_EMPLOYEE_ID = "EMP-029"; // Hari Priya's employee ID
 
 const ApproverEmployeeDashboard = () => {
   const navigate = useNavigate();
@@ -196,26 +242,42 @@ const ApproverEmployeeDashboard = () => {
     setLoading(true);
     setDataError("");
 
-    // Fetch Hari Priya's profile from database
+    // Fetch Hari Priya's profile from database (hrmss_employees)
     const profileRes = await supabase
       .from(EMPLOYEES_TABLE)
       .select("*")
       .eq("employee_id", ADMIN_EMPLOYEE_ID)
       .maybeSingle();
 
-    if (profileRes.data) {
-      const p = profileRes.data;
+    // Also fetch from hrmss_employee_profiles for experience fields
+    const expProfileRes = await supabase
+      .from("hrmss_employee_profiles")
+      .select("employee_id, total_experience, relevant_experience")
+      .eq("employee_id", ADMIN_EMPLOYEE_ID)
+      .maybeSingle();
+
+    const empData = profileRes.data || {};
+    const expData = expProfileRes.data || {};
+    console.log("[Dashboard] Employee data:", empData);
+    console.log("[Dashboard] Profile data:", expData);
+
+    if (profileRes.data || expProfileRes.data) {
+      const p = empData;
       setAdminProfile({
         name: p.full_name || p.name || "Hari Priya",
         id: p.employee_id || ADMIN_EMPLOYEE_ID,
-        role: p.role || p.designation || p.position || "Admin",
-        dept: p.department || p.dept || "",
-        reportingManager: p.reporting_manager || p.manager || "",
-        joiningDate: p.join_date || p.joining_date || p.date_of_joining || "",
-        workMode: p.location || p.work_mode || "",
-        totalExperience: p.total_experience || "",
-        relevantExperience: p.relevant_experience || "",
+        // In hrmss_employees: department = Designation, role = Team
+        role: p.department || p.designation || "Admin",
+        dept: p.role || p.team || "",
+        reportingManager: p.reporting_manager || "",
+        joiningDate: p.join_date || "",
+        workMode: p.location || "",
+        // Fetch experience from hrmss_employee_profiles
+        totalExperience: expData.total_experience || p.total_experience || "",
+        relevantExperience: expData.relevant_experience || p.relevant_experience || "",
       });
+    } else {
+      console.log("[Dashboard] No employee profile found for:", ADMIN_EMPLOYEE_ID);
     }
 
     // Fetch admin's own leave requests to calculate leave balance
@@ -230,10 +292,10 @@ const ApproverEmployeeDashboard = () => {
       const hariPriyaLeaves = (adminLeavesRes.data || []).filter((row) => {
         const adminId = String(row.admin_id || "").toLowerCase();
         const adminName = String(row.admin_name || "").toLowerCase();
-        // Match by EMP-001 or by name containing "hari" or "priya"
+        // Match by EMP-029 or by name containing "hari" or "priya"
         return (
-          adminId === "emp-001" ||
-          adminId === "adm-001" ||
+          adminId === "emp-029" ||
+          adminId === "adm-029" ||
           adminName.includes("hari") ||
           adminName.includes("priya")
         );
@@ -623,8 +685,8 @@ const ApproverEmployeeDashboard = () => {
               { label: "Reporting Manager", value: adminProfile.reportingManager },
               { label: "Date of Joining", value: adminProfile.joiningDate ? fmtDate(adminProfile.joiningDate) : "-" },
               { label: "Work Mode", value: adminProfile.workMode },
-              { label: "Total Experience", value: adminProfile.totalExperience },
-              { label: "Relevant Experience", value: adminProfile.relevantExperience },
+              { label: "Total Experience", value: formatExperienceDuration(adminProfile.totalExperience) },
+              { label: "Relevant Experience", value: formatExperienceDuration(adminProfile.relevantExperience) },
             ].map((item) => (
               <div
                 key={item.label}

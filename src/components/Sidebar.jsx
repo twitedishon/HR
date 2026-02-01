@@ -1,10 +1,9 @@
 import { NavLink } from "react-router-dom";
 
 const linkClasses = ({ isActive }) =>
-  `block px-3 py-2 rounded-md text-sm font-medium ${
-    isActive
-      ? "bg-blue-600 text-white"
-      : "text-gray-700 hover:bg-blue-50 hover:text-blue-700"
+  `block px-3 py-2 rounded-md text-sm font-medium ${isActive
+    ? "bg-blue-600 text-white"
+    : "text-gray-700 hover:bg-blue-50 hover:text-blue-700"
   }`;
 
 const Sidebar = () => {
@@ -22,7 +21,7 @@ const Sidebar = () => {
           Attendance
         </NavLink>
         <NavLink to="/dashboard/leave" className={linkClasses}>
-         LeaveManagement
+          LeaveManagement
         </NavLink>
         <NavLink to="/dashboard/payslips" className={linkClasses}>
           Payslips
@@ -35,9 +34,6 @@ const Sidebar = () => {
         </NavLink>
 
       </nav>
-      <div className="p-4 border-t text-xs text-gray-400">
-        © {new Date().getFullYear()} HRMS Lite
-      </div>
     </aside>
   );
 };
