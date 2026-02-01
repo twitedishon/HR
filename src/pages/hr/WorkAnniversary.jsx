@@ -39,6 +39,35 @@ function getYearsOfService(joinDate) {
   return years;
 }
 
+function getServiceDuration(joinDate) {
+  if (!joinDate) return { years: 0, months: 0 };
+  const today = new Date();
+  const start = new Date(joinDate);
+  if (Number.isNaN(start.getTime())) return { years: 0, months: 0 };
+
+  let years = today.getFullYear() - start.getFullYear();
+  let months = today.getMonth() - start.getMonth();
+
+  if (today.getDate() < start.getDate()) {
+    months--;
+  }
+
+  if (months < 0) {
+    years--;
+    months += 12;
+  }
+
+  return { years: Math.max(0, years), months: Math.max(0, months) };
+}
+
+function formatServiceDuration(joinDate) {
+  const { years, months } = getServiceDuration(joinDate);
+  if (years === 0 && months === 0) return "New";
+  if (years === 0) return `${months} mo`;
+  if (months === 0) return `${years} yr${years === 1 ? "" : "s"}`;
+  return `${years} yr${years === 1 ? "" : "s"} ${months} mo`;
+}
+
 function daysUntilAnniversary(joinDate) {
   if (!joinDate) return 9999;
   const today = new Date();
@@ -200,6 +229,7 @@ export default function WorkAnniversary() {
               phone: emp.mobile_number || "",
               avatar: emp.avatar_url || "",
               yearsOfService: years,
+              serviceDuration: formatServiceDuration(joinDate),
               daysUntil: days,
             };
           })
@@ -706,8 +736,7 @@ export default function WorkAnniversary() {
 
                             <div className="flex flex-col items-end gap-2">
                               <span className={`wa-chip ${soon ? "soon" : ""}`}>
-                                {emp.yearsOfService} yr
-                                {emp.yearsOfService === 1 ? "" : "s"}
+                                {emp.serviceDuration}
                               </span>
                               {soon && (
                                 <span className="text-[11px] font-semibold text-amber-700">
@@ -757,8 +786,7 @@ export default function WorkAnniversary() {
               <div className="wa-spotlight-body space-y-4">
                 {selected ? (
                   <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
-                    Celebrating {selected.yearsOfService} year
-                    {selected.yearsOfService === 1 ? "" : "s"} of service
+                    Celebrating {selected.serviceDuration} of service
                   </div>
                 ) : (
                   <div className="rounded-2xl bg-slate-50 text-slate-600 px-4 py-3 text-sm font-semibold">
@@ -805,7 +833,7 @@ export default function WorkAnniversary() {
                   ) : null}
                 </div>
 
-               
+
               </div>
             </div>
           </div>

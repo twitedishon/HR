@@ -69,6 +69,13 @@ const monthKey = (monthName, year) => {
   return `${year}-${mm}`; // "2025-01"
 };
 
+// Format period from YYYY-MM to MM/YYYY for display
+const formatPeriodDisplay = (periodKey) => {
+  if (!periodKey || !periodKey.includes("-")) return periodKey;
+  const [year, month] = periodKey.split("-");
+  return `${month}/${year}`;
+};
+
 const monthRange = (monthName, year) => {
   const mm = Number(monthMap[monthName] || "01");
   const yy = Number(year);
@@ -298,7 +305,7 @@ export default function PayrollPage() {
   const now = new Date();
   const [month, setMonth] = useState(monthList[now.getMonth()] || "January");
   const [year, setYear] = useState(String(now.getFullYear()));
-  const [tab, setTab] = useState("overview"); // overview | list | details
+  const [tab, setTab] = useState("all"); // all | approved | pending
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All"); // All | Approved | Pending
 
@@ -569,7 +576,7 @@ export default function PayrollPage() {
   /* ---------------- FILTERED LIST ---------------- */
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase();
-   
+
     return rows.filter((r) => {
       // 1. Status Filter
       if (statusFilter !== "All" && r.status !== statusFilter) {
@@ -775,13 +782,13 @@ export default function PayrollPage() {
   const onSubmitForApproval = async () => {
     setActionSaving(true);
     setActionSaveErr("");
-   
+
     // Check if any payrolls exist
     const hasPayrolls = rows.some(r => r.payrollId);
     if (!hasPayrolls) {
-        setActionSaveErr("No payroll records generated yet.");
-        setActionSaving(false);
-        return;
+      setActionSaveErr("No payroll records generated yet.");
+      setActionSaving(false);
+      return;
     }
 
     try {
@@ -1175,11 +1182,11 @@ export default function PayrollPage() {
               <option value="" disabled>
                 Select...
               </option>
-                  {rows.map((r) => (
-                    <option key={r.empId} value={r.empId}>
-                      {r.empId} - {r.name}
-                    </option>
-                  ))}
+              {rows.map((r) => (
+                <option key={r.empId} value={r.empId}>
+                  {r.empId} - {r.name}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -1284,18 +1291,18 @@ export default function PayrollPage() {
               <p className="text-lg font-extrabold text-blue-700 tabular-nums">{inr(actionCTC)}</p>
             </div>
             <div className="mt-2 space-y-1 text-[10px] text-blue-700">
-                <div className="flex items-center justify-between">
-                    <span>Gross Salary</span>
-                    <span className="font-semibold">{inr(actionGross)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                    <span>Employer PF</span>
-                    <span className="font-semibold">{inr(actionForm.pfEmployer)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                    <span>Employer ESI</span>
-                    <span className="font-semibold">{inr(actionForm.esiEmployer)}</span>
-                </div>
+              <div className="flex items-center justify-between">
+                <span>Gross Salary</span>
+                <span className="font-semibold">{inr(actionGross)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Employer PF</span>
+                <span className="font-semibold">{inr(actionForm.pfEmployer)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Employer ESI</span>
+                <span className="font-semibold">{inr(actionForm.esiEmployer)}</span>
+              </div>
             </div>
             <p className="mt-1 text-[10px] text-blue-700 uppercase">CTC = Gross salary + (Employer PF + Employer ESI)</p>
           </button>
@@ -1306,17 +1313,17 @@ export default function PayrollPage() {
             </div>
           ) : null}
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={saveAndApprovePayroll}
-                disabled={actionSaving || !actionEmpId}
-                className="h-9 rounded-lg border border-blue-600 bg-blue-600 px-4 text-[11px] font-extrabold text-white hover:opacity-95 disabled:opacity-60"
-              >
-                {actionSaving ? "Saving..." : "Save Payroll (Auto-Approve)"}
-              </button>
-            </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={saveAndApprovePayroll}
+              disabled={actionSaving || !actionEmpId}
+              className="h-9 rounded-lg border border-blue-600 bg-blue-600 px-4 text-[11px] font-extrabold text-white hover:opacity-95 disabled:opacity-60"
+            >
+              {actionSaving ? "Saving..." : "Save Payroll (Auto-Approve)"}
+            </button>
           </div>
+        </div>
       );
     }
 
@@ -1346,7 +1353,7 @@ export default function PayrollPage() {
             <span className="text-[11px] font-semibold text-slate-500">Batch Status</span>
             <span className="text-[11px] font-bold text-slate-900">{batchStatus}</span>
           </div>
-         
+
           {batchStatus === "Approved" ? (
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
               This payroll batch is already approved.
@@ -1451,7 +1458,7 @@ export default function PayrollPage() {
               </div>
             </div>
             <p className="mt-2 text-[11px] text-slate-500">
-              Payslip generated by HRMS · Period: <span className="font-bold text-slate-900">{periodKey}</span>
+              Payslip generated by HRMS · Period: <span className="font-bold text-slate-900">{formatPeriodDisplay(periodKey)}</span>
             </p>
           </div>
 
@@ -1533,7 +1540,7 @@ export default function PayrollPage() {
             <Detail label="Bank Name" value={bankName} />
             <Detail label="Account Number" value={maskAccount(accountNumber)} />
             <Detail label="Payment Mode" value="Bank Transfer" />
-            <Detail label="Paid On" value={periodKey} />
+            <Detail label="Paid On" value={formatPeriodDisplay(periodKey)} />
           </div>
 
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-[11px] text-emerald-800">
@@ -1626,10 +1633,6 @@ export default function PayrollPage() {
                 <p className="mt-1 text-[11px] text-white/70">Manage employee salaries and payments</p>
               </div>
             </div>
-
-            <span className="inline-flex items-center rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold text-slate-900">
-              {batchStatus === "Paid" ? "Paid" : batchStatus === "Approved" ? "Approved" : "Draft"}
-            </span>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] text-white/70">
@@ -1729,48 +1732,19 @@ export default function PayrollPage() {
 
         {/* Tabs */}
         <div className="flex flex-wrap gap-2">
-          <TabButton active={tab === "overview"} icon={LayoutGrid} onClick={() => setTab("overview")}>
-            Overview
+          <TabButton active={tab === "all"} icon={LayoutGrid} onClick={() => { setTab("all"); setStatusFilter("All"); }}>
+            All
           </TabButton>
-          <TabButton active={tab === "list"} icon={ListChecks} onClick={() => setTab("list")}>
-            Employee List
+          <TabButton active={tab === "approved"} icon={ListChecks} onClick={() => { setTab("approved"); setStatusFilter("Approved"); }}>
+            Approved
           </TabButton>
-          <TabButton active={tab === "details"} icon={BadgeIndianRupee} onClick={() => setTab("details")}>
-            Salary Details
+          <TabButton active={tab === "pending"} icon={BadgeIndianRupee} onClick={() => { setTab("pending"); setStatusFilter("Pending"); }}>
+            Pending
           </TabButton>
         </div>
 
-        {/* Approved Payroll Summary (Prominent) */}
-        {tab === "overview" && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <ShieldCheck size={20} className="text-emerald-600" />
-                <h2 className="text-lg font-bold text-emerald-900">Approved Payroll Summary</h2>
-              </div>
-              <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider">
-                {month} {year}
-              </span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-xl p-4 border border-emerald-100">
-                <p className="text-[10px] font-bold text-slate-500 uppercase">Approved Count</p>
-                <p className="text-2xl font-black text-emerald-600">{headerBreakdown.processed}</p>
-              </div>
-              <div className="bg-white rounded-xl p-4 border border-emerald-100">
-                <p className="text-[10px] font-bold text-slate-500 uppercase">Total Approved Net</p>
-                <p className="text-2xl font-black text-slate-900">{inr(headerBreakdown.approvedNetTotal)}</p>
-              </div>
-              <div className="bg-white rounded-xl p-4 border border-emerald-100">
-                <p className="text-[10px] font-bold text-slate-500 uppercase">Batch Status</p>
-                <p className="text-2xl font-black text-indigo-600">{batchStatus}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Employee Salary List */}
-        {(tab === "overview" || tab === "list") && (
+        {(tab === "all" || tab === "approved" || tab === "pending") && (
           <>
             <div className="rounded-xl border border-slate-200 bg-white">
               <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1780,22 +1754,6 @@ export default function PayrollPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <div className="relative hidden md:block">
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="h-9 w-32 appearance-none rounded-lg border border-slate-200 bg-white pl-3 pr-8 text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100"
-                    >
-                      <option value="All">All Status</option>
-                      <option value="Approved">Approved</option>
-                      <option value="Pending">Pending</option>
-                      <option value="Generated">Generated</option>
-                    </select>
-                    <Filter
-                      size={14}
-                      className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"
-                    />
-                  </div>
 
                   <div className="relative">
                     <input
@@ -1916,8 +1874,8 @@ export default function PayrollPage() {
               <div className="p-4" />
             </div>
 
-            {/* Payroll Actions ONLY in Overview */}
-            {tab === "overview" && (
+            {/* Payroll Actions ONLY in All tab */}
+            {tab === "all" && (
               <div className="rounded-xl border border-slate-200 bg-white p-4">
                 <div className="flex items-center gap-2">
                   <Settings size={16} className="text-slate-600" />
@@ -2427,7 +2385,7 @@ function Detail({ label, value, emphasize = false }) {
   );
 }
 
-function LabeledInput({ label, placeholder = "", value = "", onChange = () => {} }) {
+function LabeledInput({ label, placeholder = "", value = "", onChange = () => { } }) {
   return (
     <label className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 flex flex-col gap-1">
       <span className="text-[10px] font-semibold text-slate-500">{label}</span>
@@ -2442,14 +2400,14 @@ function LabeledInput({ label, placeholder = "", value = "", onChange = () => {}
   );
 }
 
-function FieldNum({ label, value, onChange = () => {}, readOnly = false, disabled = false }) {
+function FieldNum({ label, value, onChange = () => { }, readOnly = false, disabled = false }) {
   const handleChange =
     readOnly || disabled
       ? undefined
       : (e) => {
-          const parsed = Number(e.target.value);
-          onChange(Number.isFinite(parsed) ? parsed : 0);
-        };
+        const parsed = Number(e.target.value);
+        onChange(Number.isFinite(parsed) ? parsed : 0);
+      };
 
   return (
     <label className="block">
