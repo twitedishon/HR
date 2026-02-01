@@ -72,6 +72,11 @@ const ApproverCareerGuidance = () => {
   const designation = profile?.designation?.toLowerCase() || "";
   const department = profile?.department?.toLowerCase() || "";
 
+  const isBusinessDev =
+    department.includes("business development") ||
+    designation.includes("business development") ||
+    designation.includes("bde");
+
   // Check if user is in a technology role (AI, Intern, Developer, UI/UX, etc.)
   const isTechRole =
     designation.includes("ai") ||
@@ -82,13 +87,18 @@ const ApproverCareerGuidance = () => {
     department.includes("engineering") ||
     department.includes("product");
 
-  const matrixData = !isTechRole ? [
+  const matrixData = isBusinessDev ? [
+    { icon: Briefcase, color: "text-purple-600", title: "Business Development Manager (BDM)", exp: "Minimum 5+ years" },
+    { icon: Users, color: "text-blue-500", title: "Sr. Business Development Executive (Sr.BDE)", exp: "3+ years" },
+    { icon: UserCheck, color: "text-teal-500", title: "Business Development Executive (BDE)", exp: "1–2 years" },
+    { icon: GraduationCap, color: "text-orange-500", title: "Business Development Interns", exp: "Final-year MBA / Any graduate with sales interest" },
+  ] : !isTechRole ? [
     { icon: UserPlus, color: "text-purple-500", title: "Trainee IT Recruiter", exp: "Fresher" },
-    { icon: Phone, color: "text-blue-600", title: "IT Recruiter", exp: "> 1yr" },
-    { icon: UserCheck, color: "text-orange-500", title: "Talent Acquisition Executive", exp: "1 - 2.5yr" },
-    { icon: Search, color: "text-teal-500", title: "Talent Acquisition Specialist", exp: "3+" },
-    { icon: Users, color: "text-blue-500", title: "Talent Acquisition - Team Lead", exp: "4.5+" },
-    { icon: Briefcase, color: "text-purple-600", title: "Talent Acquisition - Manager", exp: "7+" },
+    { icon: Phone, color: "text-blue-600", title: "IT Recruiter", exp: "> 1 year" },
+    { icon: UserCheck, color: "text-orange-500", title: "Talent Acquisition Executive", exp: "1 - 2.5 years" },
+    { icon: Search, color: "text-teal-500", title: "Talent Acquisition Specialist", exp: "3+ years" },
+    { icon: Users, color: "text-blue-500", title: "Talent Acquisition - Team Lead", exp: "4.5+ years" },
+    { icon: Briefcase, color: "text-purple-600", title: "Talent Acquisition - Manager", exp: "7+ years" },
   ] : [
     { icon: GraduationCap, color: "text-purple-600", title: "Trainee Developer (Intern / Student)", exp: "0 to 6 months" },
     { icon: User, color: "text-blue-500", title: "Junior Developer (Fresher)", exp: "0 to 1 year" },
@@ -116,7 +126,7 @@ const ApproverCareerGuidance = () => {
               Designation & Experience Matrix
             </h1>
             <p className="text-slate-500 mt-2 font-medium">
-              Twite AI Technologies • <span className="text-purple-600 font-bold">{!isTechRole ? "Talent Acquisition" : "Technology"} Division</span>
+              Twite AI Technologies • <span className="text-purple-600 font-bold">{isBusinessDev ? "Business Development" : !isTechRole ? "Talent Acquisition" : "Technology"}</span>
             </p>
           </div>
         </div>

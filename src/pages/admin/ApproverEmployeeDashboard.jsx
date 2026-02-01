@@ -1,15 +1,80 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Users,
-  CalendarDays,
-  ClipboardList,
-  ArrowRight,
-  X,
-} from "lucide-react";
+import { CalendarCheck, AlertTriangle, CheckCircle2 } from "lucide-react";
+
 import { supabase } from "../../lib/supabaseClient";
+import {
+  Badge,
+  SectionCard,
+  PrimaryButton,
+  GhostButton,
+  Modal,
+} from "../employee/shared/ui.jsx";
+import { formatDDMMYYYY } from "../../lib/dateUtils";
+
+const toneChip = {
+  Pending: "warning",
+  Approved: "success",
+  Rejected: "danger",
+  Cancelled: "neutral",
+};
 
 const AUTH_KEY = "HRMSS_AUTH_SESSION";
+const EMPLOYEES_TABLE = "hrmss_employees";
+const LEAVES_TABLE = "hrmss_leave_requests";
+const ADMIN_LEAVES_TABLE = "admin_leaves";
+
+// Leave type configurations
+const HALF_DAY_TYPES = new Set([
+  "casual leave (morning)",
+  "casual leave (evening)",
+  "sick leave (morning)",
+  "sick leave (evening)",
+  "permissions",
+]);
+
+const GROUPED_LEAVE_TYPES = {
+  "casual leave (morning)": "casual leave",
+  "casual leave (evening)": "casual leave",
+  "sick leave (morning)": "sick leave",
+  "sick leave (evening)": "sick leave",
+};
+
+const baseAbsenceGroups = [
+  {
+    id: "casual",
+    title: "Casual Leave",
+    items: [{ type: "Casual Leave", total: 12 }],
+  },
+  {
+    id: "sick",
+    title: "Sick Leave",
+    items: [{ type: "Sick Leave", total: 12 }],
+  },
+  {
+    id: "other",
+    title: "Other Absence Types",
+    items: [
+      { type: "Maternity/Paternity", total: 12 },
+      { type: "Paid Leave", total: 12 },
+      { type: "Work from home", total: 12 },
+      { type: "Holidays", total: 12 },
+      { type: "Permissions", total: 6 },
+      { type: "Special Leave", total: 12 },
+      { type: "Bereavement Leave", total: 12 },
+    ],
+  },
+];
+
+function normalizeLeaveType(raw) {
+  return String(raw || "").trim();
+}
+
+function formatLeaveTotal(value) {
+  if (!Number.isFinite(value)) return "-";
+  const rounded = Math.round(value * 2) / 2;
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+}
 
 const readAuthSession = () => {
   try {
@@ -58,14 +123,6 @@ const matchesAssignedEmployee = (employee, sessionKeys) => {
   return false;
 };
 
-/* ===================== CONFIG ===================== */
-
-/** ✅ Change ONLY if your table names differ */
-const EMPLOYEES_TABLE = "hrmss_employees"; // <-- if your employees table name is different, change here
-const LEAVES_TABLE = "hrmss_leave_requests";
-const ADMIN_LEAVES_TABLE = "admin_leaves";
-
-/* ===================== HELPERS ===================== */
 const safeStr = (v) => (v == null ? "" : String(v));
 const pick = (row, keys, fallback = "") => {
   for (const k of keys) {
@@ -91,8 +148,15 @@ const diffDaysInclusive = (from, to) => {
   return Number.isFinite(days) ? Math.max(days, 1) : 1;
 };
 
+function fmtDate(d) {
+  return formatDDMMYYYY(d);
+}
 
-const AdminDashboard = () => {
+const fmtOrDash = (value) => (value ? String(value) : "-");
+
+const ADMIN_EMPLOYEE_ID = "EMP-001"; // Hari Priya's employee ID
+
+const ApproverEmployeeDashboard = () => {
   const navigate = useNavigate();
   const adminSession = useMemo(() => readAuthSession(), []);
   const sessionKeys = useMemo(
@@ -100,23 +164,96 @@ const AdminDashboard = () => {
     [adminSession]
   );
 
-  /* ===================== REAL DATA STATES ===================== */
   const [employeesList, setEmployeesList] = useState([]);
   const [leaveRequestsList, setLeaveRequestsList] = useState([]);
   const [pendingLeaves, setPendingLeaves] = useState([]);
 
   const [totalEmployees, setTotalEmployees] = useState(0);
   const [pendingLeaveRequests, setPendingLeaveRequests] = useState(0);
-
-  // (optional) keep existing UI for present; you can wire later
   const [presentToday, setPresentToday] = useState(0);
 
-
   const [dataError, setDataError] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  /* ===================== FETCH: EMPLOYEES + LEAVES ===================== */
+  // Admin profile data fetched from database
+  const [adminProfile, setAdminProfile] = useState({
+    name: "",
+    id: ADMIN_EMPLOYEE_ID,
+    role: "",
+    dept: "",
+    reportingManager: "",
+    joiningDate: "",
+    workMode: "",
+    totalExperience: "",
+    relevantExperience: "",
+  });
+
+  // Admin's own leave requests to calculate leave balance
+  const [adminLeaveRequests, setAdminLeaveRequests] = useState([]);
+  const [selectedAbsenceGroup, setSelectedAbsenceGroup] = useState(null);
+
   const fetchDashboardData = async () => {
+    setLoading(true);
     setDataError("");
+
+    // Fetch Hari Priya's profile from database
+    const profileRes = await supabase
+      .from(EMPLOYEES_TABLE)
+      .select("*")
+      .eq("employee_id", ADMIN_EMPLOYEE_ID)
+      .maybeSingle();
+
+    if (profileRes.data) {
+      const p = profileRes.data;
+      setAdminProfile({
+        name: p.full_name || p.name || "Hari Priya",
+        id: p.employee_id || ADMIN_EMPLOYEE_ID,
+        role: p.role || p.designation || p.position || "Admin",
+        dept: p.department || p.dept || "",
+        reportingManager: p.reporting_manager || p.manager || "",
+        joiningDate: p.join_date || p.joining_date || p.date_of_joining || "",
+        workMode: p.location || p.work_mode || "",
+        totalExperience: p.total_experience || "",
+        relevantExperience: p.relevant_experience || "",
+      });
+    }
+
+    // Fetch admin's own leave requests to calculate leave balance
+    // Try fetching by employee_id and also by admin_id, and by name
+    const adminLeavesRes = await supabase
+      .from(ADMIN_LEAVES_TABLE)
+      .select("id, leave_type, from_date, to_date, status, reason, applied_at, admin_id, admin_name")
+      .order("applied_at", { ascending: false });
+
+    if (adminLeavesRes.data) {
+      // Filter to only show Hari Priya's leaves (match by ID or name)
+      const hariPriyaLeaves = (adminLeavesRes.data || []).filter((row) => {
+        const adminId = String(row.admin_id || "").toLowerCase();
+        const adminName = String(row.admin_name || "").toLowerCase();
+        // Match by EMP-001 or by name containing "hari" or "priya"
+        return (
+          adminId === "emp-001" ||
+          adminId === "adm-001" ||
+          adminName.includes("hari") ||
+          adminName.includes("priya")
+        );
+      });
+
+      const mapped = hariPriyaLeaves.map((row) => {
+        const from = row.from_date ? String(row.from_date) : "";
+        const to = row.to_date ? String(row.to_date) : from;
+        return {
+          id: row.id,
+          type: row.leave_type || "-",
+          from,
+          to,
+          days: diffDaysInclusive(from, to),
+          status: row.status || "Pending",
+          reason: row.reason || "-",
+        };
+      });
+      setAdminLeaveRequests(mapped);
+    }
 
     // 1) Employees
     const eRes = await supabase
@@ -141,7 +278,6 @@ const AdminDashboard = () => {
         ]);
         const managerEmail = pick(r, ["manager_email", "reporting_manager_email"]);
 
-        // status normalization
         const rawStatus = pick(r, ["status"], "");
         const active =
           r?.active ?? r?.is_active ?? r?.enabled ?? (rawStatus ? null : null);
@@ -189,7 +325,6 @@ const AdminDashboard = () => {
     if (l2.error) setDataError((p) => `${p ? p + " | " : ""}Admin Leaves: ${l2.error.message}`);
 
     const mapLeaveToStatRow = (r, source) => {
-      // employee/owner id + name
       const ownerId =
         source === "admin"
           ? pick(r, ["admin_id", "owner_id", "employee_id", "emp_id", "id"], "")
@@ -230,7 +365,6 @@ const AdminDashboard = () => {
 
       const type = pick(r, ["leave_type", "type"], "-");
 
-      // show "Waiting for HR/Manager" if fields exist, else Pending
       const reqToRole = safeStr(pick(r, ["request_to_role"], ""));
       const statusLabel =
         reqToRole === "hr"
@@ -244,7 +378,10 @@ const AdminDashboard = () => {
         name: safeStr(name),
         type: safeStr(type),
         days,
+        from,
+        to,
         status: statusLabel,
+        reason: pick(r, ["reason"], "-"),
       };
     };
 
@@ -258,13 +395,11 @@ const AdminDashboard = () => {
     const approval1 = (l1.data || []).map((r) => mapLeaveToPendingApprovalRow(r, "hrmss"));
     const approval2 = (l2.data || []).map((r) => mapLeaveToPendingApprovalRow(r, "admin"));
 
-    // Show top 3 in card (same UI behavior)
     const mergedApprovals = [...approval1, ...approval2]
-      .sort((a, b) => safeStr(b.reqId).localeCompare(safeStr(a.reqId)))
-      .slice(0, 3);
+      .sort((a, b) => safeStr(b.reqId).localeCompare(safeStr(a.reqId)));
 
     setPendingLeaves(mergedApprovals);
-
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -272,373 +407,404 @@ const AdminDashboard = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKeys]);
 
-  /* ===================== DERIVED (UI SAME) ===================== */
-  const presentPercentage = Math.min(
-    100,
-    totalEmployees > 0 ? Math.round((presentToday / totalEmployees) * 100) : 0
+  const recentLeaves = useMemo(
+    () => (pendingLeaves || []).slice(0, 4),
+    [pendingLeaves]
   );
 
+  const [selectedLeave, setSelectedLeave] = useState(null);
+  const [viewAllLeaves, setViewAllLeaves] = useState(false);
 
-  // ✅ demo present list (keep as-is). You can wire attendance later.
-  const presentList = useMemo(() => [], []);
-
-  const attendanceSummary = useMemo(
-    () => [
-      { label: "Present", value: presentToday, color: "bg-sky-500" },
-      { label: "Absent", value: Math.max(0, totalEmployees - presentToday), color: "bg-rose-500" },
-      { label: "On Leave", value: 0, color: "bg-amber-500" },
-    ],
-    [presentToday, totalEmployees]
-  );
-
-
-  const notifications = useMemo(() => [], []);
-
-  const quickActions = [
-    { label: "Approve Leaves", description: "Review pending leave requests", path: "/dashboard/leave" },
-    // { label: "Generate Payroll", description: "Run monthly payroll", path: "/dashboard/payroll" },
-    { label: "View Attendance", description: "Check daily attendance report", path: "/dashboard/attendance" },
-  ];
-
-  /* ✅ DYNAMIC CARD COLORS (NO GREEN) */
-  const cardGradients = {
-    employees:
-      totalEmployees <= 5
-        ? "from-slate-800 to-slate-700"
-        : totalEmployees <= 20
-          ? "from-slate-900 to-slate-800"
-          : "from-slate-950 to-slate-900",
-
-    present:
-      presentPercentage < 50
-        ? "from-blue-800 to-blue-700"
-        : presentPercentage < 80
-          ? "from-blue-900 to-blue-800"
-          : "from-slate-900 to-blue-900",
-
-    leave:
-      pendingLeaveRequests <= 1
-        ? "from-slate-700 to-slate-600"
-        : pendingLeaveRequests <= 4
-          ? "from-slate-800 to-slate-700"
-          : "from-slate-900 to-slate-800",
+  const openApproveLeaves = () => {
+    navigate("/dashboard/leave");
   };
 
-  const statCards = [
-    {
-      id: "employees",
-      title: "Employees",
-      value: totalEmployees,
-      subtitle: "Assigned to you",
-      gradient: cardGradients.employees,
-      icon: Users,
-    },
-    {
-      id: "present",
-      title: "Present Today",
-      value: presentToday,
-      subtitle: "Attendance marked",
-      gradient: cardGradients.present,
-      icon: CalendarDays,
-    },
-    {
-      id: "leave",
-      title: "Pending Leave",
-      value: pendingLeaveRequests,
-      subtitle: "Awaiting approval",
-      gradient: cardGradients.leave,
-      icon: ClipboardList,
-    },
-  ];
+  // Calculate leave balance for admin
+  const absenceGroups = useMemo(() => {
+    const usageByType = {};
 
-  // ✅ small view modal (for ALL clicks)
-  const [viewOpen, setViewOpen] = useState(false);
-  const [viewTitle, setViewTitle] = useState("");
-  const [viewType, setViewType] = useState(""); // "people" | "leaves" | "notifications"
-  const [viewRows, setViewRows] = useState([]);
+    adminLeaveRequests.forEach((req) => {
+      const status = String(req.status || "").toLowerCase();
+      if (status === "cancelled" || status === "rejected") return;
 
-  const openView = (title, type, rows) => {
-    setViewTitle(title);
-    setViewType(type);
-    setViewRows(rows);
-    setViewOpen(true);
-  };
+      const normalized = normalizeLeaveType(req.type || "");
+      const key = normalized.toLowerCase();
+      if (!key) return;
 
-  const onStatClick = (cardId) => {
-    if (cardId === "employees")
-      return openView(`Employees (${totalEmployees})`, "people", employeesList);
+      const groupedKey = GROUPED_LEAVE_TYPES[key] || key;
+      const unit = HALF_DAY_TYPES.has(key) ? 0.5 : 1;
+      const days = Number(req.days || 0);
+      if (!Number.isFinite(days)) return;
 
-    if (cardId === "present")
-      return openView(`Present Today (${presentToday})`, "people", presentList);
+      usageByType[groupedKey] = (usageByType[groupedKey] || 0) + days * unit;
+    });
 
-    if (cardId === "leave")
-      return openView(`Pending Leave (${pendingLeaveRequests})`, "leaves", leaveRequestsList);
-  };
+    return baseAbsenceGroups.map((group) => ({
+      ...group,
+      items: group.items.map((item) => {
+        const key = item.type.toLowerCase();
+        const used = usageByType[key] || 0;
+        const remaining = Math.max(0, item.total - used);
+        return {
+          ...item,
+          remaining,
+        };
+      }),
+    }));
+  }, [adminLeaveRequests]);
 
   return (
-    <section className="min-h-screen bg-slate-50 px-4 py-6 md:px-8">
-      <header className="mb-6">
-        <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-700 via-sky-600 to-violet-600 p-5 text-white shadow-lg">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="space-y-1">
-              <h1 className="text-2xl sm:text-3xl font-semibold leading-tight">
-                Admin Dashboard
-              </h1>
-              {dataError ? (
-                <p className="text-xs text-white/80 mt-1">
-                  Data issue: {dataError}
-                </p>
-              ) : null}
-            </div>
-
-            <button
-              type="button"
-              onClick={fetchDashboardData}
-              className="self-start sm:self-auto rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold hover:bg-white/15"
-            >
-              Refresh
-            </button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-extrabold text-slate-900">
+              {adminProfile.name ? `${adminProfile.name}'s Dashboard` : "Admin Dashboard"}
+            </h1>
           </div>
-        </div>
-      </header>
 
-      {/* stat cards click -> modal */}
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-4 mb-6">
-        {statCards.map((card) => (
-          <button
-            key={card.id}
-            type="button"
-            onClick={() => onStatClick(card.id)}
-            className={`text-left rounded-xl bg-gradient-to-r ${card.gradient} text-white p-3 shadow-md hover:-translate-y-1 hover:shadow-lg transition`}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-white/80">
-                  {card.subtitle}
-                </p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-semibold">{card.value}</span>
-                  <span className="text-xs text-white/80">{card.title}</span>
-                </div>
-              </div>
-              {card.icon ? <card.icon size={18} /> : null}
-            </div>
-          </button>
-        ))}
+          <p className="mt-1 text-sm text-slate-500">
+            {adminProfile.name || "-"} • {adminProfile.id || "-"} •{" "}
+            {adminProfile.role || "-"} • {adminProfile.dept || "-"}
+          </p>
+
+          {dataError ? (
+            <p className="mt-1 text-xs text-amber-700">
+              <AlertTriangle className="inline -mt-0.5 mr-1" size={14} />
+              {dataError}
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-slate-400">
+              <CheckCircle2 className="inline -mt-0.5 mr-1" size={14} />
+              Welcome
+            </p>
+          )}
+
+          {loading && (
+            <p className="mt-2 text-xs text-slate-500">Loading dashboard data...</p>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <GhostButton onClick={fetchDashboardData}>Refresh</GhostButton>
+        </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-3">
-        <div className="space-y-5 lg:col-span-2">
-          {/* Attendance */}
-          <div className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-slate-100">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold text-slate-900">
-                  Monthly Attendance Summary
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Overview of employee attendance for the current month.
-                </p>
-              </div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">
-                Present {presentPercentage}%
-              </span>
-            </div>
+      <div className="grid grid-cols-1 gap-4">
+        {/* Leave Details */}
+        <SectionCard
+          title="Leave Details"
+          subtitle="Absence types + remaining balance"
+          action={<Badge tone="info">Leave</Badge>}
+        >
+          {/* Absence type cards */}
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            {absenceGroups.map((group) => {
+              // Assign different light colors based on group id
+              const colorClasses = {
+                casual: "bg-emerald-50 border-emerald-200 hover:bg-emerald-100",
+                sick: "bg-blue-50 border-blue-200 hover:bg-blue-100",
+                other: "bg-amber-50 border-amber-200 hover:bg-amber-100",
+              };
+              const cardClass = colorClasses[group.id] || "bg-slate-50 border-slate-200 hover:bg-white";
 
-            <div className="mb-4 h-3 w-full overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="h-full bg-sky-500 transition-all"
-                style={{ width: `${presentPercentage}%` }}
-              />
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3 text-xs">
-              {attendanceSummary.map((item) => (
-                <div
-                  key={item.label}
-                  className="flex items-center justify-between rounded-xl bg-gradient-to-r from-white to-slate-50 px-3 py-2 ring-1 ring-slate-100"
+              return (
+                <button
+                  key={group.id}
+                  type="button"
+                  onClick={() => setSelectedAbsenceGroup(group)}
+                  className={`rounded-2xl border px-4 py-6 text-center transition hover:shadow-sm ${cardClass}`}
                 >
-                  <div className="flex items-center gap-2">
-                    <span className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
-                    <span className="text-slate-600">{item.label}</span>
+                  <div className="text-base font-extrabold text-slate-900">
+                    {group.title}
                   </div>
-                  <span className="font-semibold text-slate-900">{item.value}</span>
-                </div>
-              ))}
-            </div>
+                  {group.items.length === 1 ? (
+                    <div className="mt-2 text-3xl font-extrabold text-slate-900">
+                      {formatLeaveTotal(group.items[0].remaining)}
+                    </div>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
+        </SectionCard>
 
-          {/* Pending Leaves */}
-          <div
-            className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-slate-100 cursor-pointer"
-            onClick={() => openView("Pending Leave Approvals", "leaves", pendingLeaves)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === "Enter" && openView("Pending Leave Approvals", "leaves", pendingLeaves)}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">
-                Pending Leave Approvals
-              </h2>
-              <button
-                type="button"
-                className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openView("Pending Leave Approvals", "leaves", pendingLeaves);
-                }}
-              >
-                View all
-              </button>
+        {/* Recent Requests - Admin's own leave requests */}
+        <SectionCard
+          title="Leave Details"
+          subtitle="Your recent leave requests"
+          action={<Badge tone="info">Leave</Badge>}
+        >
+          {/* Recent requests */}
+          <div className="rounded-2xl border overflow-hidden">
+            <div className="bg-slate-50 px-4 py-2 text-xs font-bold text-slate-700">
+              Recent Requests
             </div>
-
-            <div className="space-y-2 text-sm">
-              {pendingLeaves.length === 0 ? (
-                <div className="rounded-xl bg-slate-50 px-3 py-4 ring-1 ring-slate-100 text-xs text-slate-500">
-                  No pending leaves found.
+            <div className="divide-y">
+              {adminLeaveRequests.slice(0, 4).length === 0 ? (
+                <div className="px-4 py-3 text-sm text-slate-500">
+                  No leave requests yet.
                 </div>
               ) : (
-                pendingLeaves.map((leave) => (
-                  <button
-                    key={leave.reqId}
-                    type="button"
-                    className="w-full text-left flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-100 hover:bg-indigo-50 hover:ring-indigo-200 transition"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openView(`Leave Request • ${leave.reqId}`, "leaves", [leave]);
-                    }}
+                adminLeaveRequests.slice(0, 4).map((r) => (
+                  <div
+                    key={r.id}
+                    className="px-4 py-3 flex items-start justify-between gap-3"
                   >
-                    <div>
-                      <p className="font-semibold text-slate-900">{leave.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {leave.type} - {leave.days} day(s)
+                    <div className="min-w-0">
+                      <p className="text-sm font-extrabold text-slate-900">
+                        {r.type}{" "}
+                        <span className="text-slate-400 font-semibold">
+                          ({r.days} day{r.days > 1 ? "s" : ""})
+                        </span>
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {fmtDate(r.from)} → {fmtDate(r.to)} • {r.id}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5 truncate">
+                        {r.reason}
                       </p>
                     </div>
-                    <span className="rounded-full bg-amber-50 px-3 py-1 text-xs text-amber-700">
-                      {leave.status}
-                    </span>
-                  </button>
+
+                    <div className="shrink-0 flex items-center gap-2">
+                      <Badge tone={toneChip[r.status] || "neutral"}>
+                        {r.status}
+                      </Badge>
+
+                      {r.status === "Pending" ? (
+                        <button
+                          className="text-xs font-bold text-rose-600 hover:underline"
+                          onClick={async (event) => {
+                            event.stopPropagation();
+                            // Cancel leave request
+                            const { error } = await supabase
+                              .from(ADMIN_LEAVES_TABLE)
+                              .update({ status: "Cancelled" })
+                              .eq("id", r.id);
+                            if (!error) {
+                              fetchDashboardData();
+                            }
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
                 ))
               )}
             </div>
           </div>
-        </div>
 
-        <div className="space-y-5">
+          <div className="mt-4 flex items-center gap-2">
+            <PrimaryButton onClick={() => navigate("/dashboard/leave")}>
+              <CalendarCheck size={16} className="mr-2" />
+              Apply Leave
+            </PrimaryButton>
 
-          {/* Quick Actions */}
-          <div className="rounded-2xl bg-white p-4 shadow-md ring-1 ring-slate-100">
-            <h2 className="mb-3 text-sm font-semibold text-slate-900">
-              Quick Actions
-            </h2>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {quickActions.map((action) => (
-                <button
-                  key={action.label}
-                  type="button"
-                  className="flex flex-col rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs hover:border-indigo-500 hover:bg-indigo-50 transition"
-                  onClick={() => navigate(action.path)}
-                >
-                  <span className="mb-1 flex items-center justify-between text-sm font-semibold text-slate-900">
-                    {action.label}
-                    <ArrowRight size={14} className="text-slate-400" />
-                  </span>
-                  <span className="text-[11px] text-slate-500">
-                    {action.description}
-                  </span>
-                </button>
-              ))}
-            </div>
+            <GhostButton onClick={() => setViewAllLeaves(true)}>
+              View all
+            </GhostButton>
           </div>
-        </div>
+        </SectionCard>
+
+        {/* Job Information */}
+        <SectionCard
+          title="Job Information"
+          subtitle="Your core employment details"
+          action={<Badge tone="neutral">Profile</Badge>}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {[
+              { label: "Employee ID", value: adminProfile.id },
+              { label: "Designation", value: adminProfile.role },
+              { label: "Department", value: adminProfile.dept },
+              { label: "Reporting Manager", value: adminProfile.reportingManager },
+              { label: "Date of Joining", value: adminProfile.joiningDate ? fmtDate(adminProfile.joiningDate) : "-" },
+              { label: "Work Mode", value: adminProfile.workMode },
+              { label: "Total Experience", value: adminProfile.totalExperience },
+              { label: "Relevant Experience", value: adminProfile.relevantExperience },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="rounded-2xl border bg-slate-50 px-4 py-3"
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  {item.label}
+                </p>
+                <p className="mt-1 text-base font-bold text-slate-900">
+                  {fmtOrDash(item.value)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
       </div>
 
-      {/* ✅ MODAL */}
-      {viewOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setViewOpen(false)}
-            aria-label="Close"
-          />
+      {/* Absence Details Modal */}
+      <Modal
+        open={!!selectedAbsenceGroup}
+        title={selectedAbsenceGroup?.title || "Absence Details"}
+        onClose={() => setSelectedAbsenceGroup(null)}
+      >
+        <div className="rounded-2xl border overflow-hidden">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-4 py-2 text-left text-xs font-bold text-slate-600">
+                  Type
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-bold text-slate-600">
+                  Total
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-bold text-slate-600">
+                  Remaining
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {(selectedAbsenceGroup?.items || []).map((item) => (
+                <tr key={`${selectedAbsenceGroup?.id}-${item.type}`}>
+                  <td className="px-4 py-2 text-slate-700">{item.type}</td>
+                  <td className="px-4 py-2 font-semibold text-slate-900">
+                    {item.total}
+                  </td>
+                  <td className="px-4 py-2 font-semibold text-slate-900">
+                    {formatLeaveTotal(item.remaining)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Modal>
 
-          <div className="relative w-full max-w-md rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200">
-            <div className="flex items-center justify-between border-b px-3 py-2">
-              <h3 className="text-sm font-semibold text-slate-900">{viewTitle}</h3>
-              <button
-                type="button"
-                onClick={() => setViewOpen(false)}
-                className="rounded-xl border border-slate-200 p-2 hover:bg-slate-50"
-              >
-                <X size={18} />
-              </button>
+      {/* Leave Details Modal */}
+      <Modal
+        open={!!selectedLeave}
+        title="Leave Request Details"
+        subtitle={selectedLeave?.reqId || ""}
+        onClose={() => setSelectedLeave(null)}
+      >
+        {selectedLeave && (
+          <div className="space-y-4">
+            <div className="rounded-2xl border overflow-hidden">
+              <table className="min-w-full text-sm">
+                <tbody className="divide-y">
+                  <tr>
+                    <td className="px-4 py-2 text-slate-500 font-medium">Employee</td>
+                    <td className="px-4 py-2 text-slate-900 font-bold">{selectedLeave.name}</td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-2 text-slate-500 font-medium">Leave Type</td>
+                    <td className="px-4 py-2 text-slate-900">{selectedLeave.type}</td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-2 text-slate-500 font-medium">Duration</td>
+                    <td className="px-4 py-2 text-slate-900">
+                      {fmtDate(selectedLeave.from)} → {fmtDate(selectedLeave.to)} ({selectedLeave.days} day{selectedLeave.days > 1 ? "s" : ""})
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-2 text-slate-500 font-medium">Reason</td>
+                    <td className="px-4 py-2 text-slate-900">{selectedLeave.reason}</td>
+                  </tr>
+                  <tr>
+                    <td className="px-4 py-2 text-slate-500 font-medium">Status</td>
+                    <td className="px-4 py-2">
+                      <Badge tone={toneChip[selectedLeave.status] || "warning"}>
+                        {selectedLeave.status}
+                      </Badge>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
-            <div className="p-3 max-h-[70vh] overflow-auto space-y-2">
-              {viewType === "people" &&
-                viewRows.map((p, idx) => (
-                  <div
-                    key={p.id || idx}
-                    className="rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-100"
-                  >
-                    <p className="text-sm font-semibold text-slate-900">{p.name}</p>
-                    <p className="text-xs text-slate-500">
-                      ID: <span className="font-medium text-slate-700">{p.id}</span> •{" "}
-                      {p.role} • {p.department}
-                    </p>
-                    <p className="mt-1 text-[11px] text-slate-500">{p.status}</p>
-                  </div>
-                ))}
-
-              {viewType === "leaves" &&
-                viewRows.map((l, idx) => (
-                  <div
-                    key={l.reqId || idx}
-                    className="rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-100"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">
-                          {l.name || "-"}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {l.reqId ? `Req: ${l.reqId} • ` : ""}
-                          {l.type ? `${l.type} • ` : ""}
-                          {typeof l.days === "number" ? `${l.days} day(s)` : ""}
-                          {l.id ? ` • Emp: ${l.id}` : ""}
-                          {l.role ? ` • ${l.role}` : ""}
-                          {l.department ? ` • ${l.department}` : ""}
-                        </p>
-                      </div>
-                      <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] text-amber-700">
-                        {l.status || "Pending"}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-
-              {viewType === "notifications" &&
-                viewRows.map((n) => (
-                  <div
-                    key={n.id}
-                    className="rounded-xl bg-slate-50 px-3 py-2 ring-1 ring-slate-100"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-700">{n.type}</span>
-                      <span className="text-[11px] text-slate-400 inline-flex items-center gap-1">
-                        <Clock3 size={12} /> {n.time}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-600">{n.text}</p>
-                  </div>
-                ))}
+            <div className="flex justify-end gap-2">
+              <GhostButton onClick={() => setSelectedLeave(null)}>Close</GhostButton>
+              <PrimaryButton onClick={openApproveLeaves}>
+                Go to Approvals
+              </PrimaryButton>
             </div>
           </div>
+        )}
+      </Modal>
+
+      {/* View All Leaves Modal */}
+      <Modal
+        open={viewAllLeaves}
+        title="All Leave Requests"
+        subtitle={`${adminLeaveRequests.length} request(s)`}
+        onClose={() => setViewAllLeaves(false)}
+      >
+        <div className="space-y-3">
+          <div className="rounded-2xl border overflow-hidden">
+            <div className="bg-slate-50 px-4 py-2 text-xs font-bold text-slate-700">
+              Leave History
+            </div>
+            <div className="divide-y max-h-[420px] overflow-auto">
+              {adminLeaveRequests.length === 0 ? (
+                <div className="px-4 py-3 text-sm text-slate-500">
+                  No leave requests yet.
+                </div>
+              ) : (
+                adminLeaveRequests.map((r) => (
+                  <div
+                    key={r.id}
+                    className="px-4 py-3 flex items-start justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-extrabold text-slate-900">
+                        {r.type}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {fmtDate(r.from)} → {fmtDate(r.to)} • {r.id} • {r.days} day(s)
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {r.reason}
+                      </p>
+                    </div>
+
+                    <div className="shrink-0 flex flex-col items-end gap-2">
+                      <Badge tone={toneChip[r.status] || "neutral"}>
+                        {r.status}
+                      </Badge>
+
+                      {r.status === "Pending" ? (
+                        <button
+                          className="text-xs font-bold text-rose-600 hover:underline"
+                          onClick={async () => {
+                            const { error } = await supabase
+                              .from(ADMIN_LEAVES_TABLE)
+                              .update({ status: "Cancelled" })
+                              .eq("id", r.id);
+                            if (!error) {
+                              fetchDashboardData();
+                            }
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <GhostButton onClick={() => setViewAllLeaves(false)}>Close</GhostButton>
+            <PrimaryButton onClick={() => navigate("/dashboard/leave")}>
+              Apply Leave
+            </PrimaryButton>
+          </div>
         </div>
-      )}
-    </section>
+      </Modal>
+    </div>
   );
 };
 
-export default AdminDashboard;
+export default ApproverEmployeeDashboard;
