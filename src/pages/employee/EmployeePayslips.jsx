@@ -43,6 +43,13 @@ const formatDateValue = (value) => {
   return `${dd}/${mm}/${yy}`;
 };
 
+// Format month from YYYY-MM to MM/YYYY
+const formatMonthDisplay = (monthKey) => {
+  if (!monthKey || !monthKey.includes("-")) return monthKey;
+  const [year, month] = monthKey.split("-");
+  return `${month}/${year}`;
+};
+
 const maskAccount = (value) => {
   const raw = String(value || "").trim();
   if (!raw) return "-";
@@ -94,16 +101,15 @@ function numberToWords(n) {
 const MonthCard = ({ label, selected, onClick, paidOn }) => (
   <button
     onClick={onClick}
-    className={`w-full text-left rounded-2xl border px-4 py-3 shadow-sm transition ${
-      selected
+    className={`w-full text-left rounded-2xl border px-4 py-3 shadow-sm transition ${selected
         ? "border-indigo-300 bg-indigo-50"
         : "border-slate-200 bg-white hover:bg-slate-50"
-    }`}
+      }`}
   >
     <div className="flex items-center justify-between">
       <div>
-        <p className="text-sm font-extrabold text-slate-900">{label}</p>
-        <p className="text-xs text-slate-500">Paid on {paidOn}</p>
+        <p className="text-sm font-extrabold text-slate-900">{formatMonthDisplay(label)}</p>
+        <p className="text-xs text-slate-500">Paid on {formatMonthDisplay(paidOn)}</p>
       </div>
       {selected ? (
         <span className="text-[11px] font-semibold text-indigo-700">
@@ -212,11 +218,11 @@ export default function EmployeePayslips() {
               { label: "ESI Contribution (Employee)", value: p.esi_employee || 0 },
               { label: "Professional Tax", value: p.professional_tax || 0 },
             ],
-            attendance: { 
-              working: p.working_days || "-", 
-              present: p.present_days || "-", 
-              paidLeave: p.paid_leave || "-", 
-              lop: p.lop_days || "-" 
+            attendance: {
+              working: p.working_days || "-",
+              present: p.present_days || "-",
+              paidLeave: p.paid_leave || "-",
+              lop: p.lop_days || "-"
             },
             bank: {
               name: emp?.bank_name || "-",
@@ -344,7 +350,7 @@ export default function EmployeePayslips() {
                   <p className="text-[11px] font-bold text-white/80">
                     Payslip for
                   </p>
-                  <p className="text-sm font-extrabold">{data?.month}</p>
+                  <p className="text-sm font-extrabold">{formatMonthDisplay(data?.month)}</p>
                 </div>
               </div>
             </div>
@@ -570,7 +576,7 @@ export default function EmployeePayslips() {
                   <div>
                     <p className="text-[10px] font-bold text-slate-500">Paid On</p>
                     <p className="text-sm font-extrabold text-slate-900">
-                      {data?.bank?.paidOn || "-"}
+                      {formatMonthDisplay(data?.bank?.paidOn) || "-"}
                     </p>
                   </div>
                 </div>

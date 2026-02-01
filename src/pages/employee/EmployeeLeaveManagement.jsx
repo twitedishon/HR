@@ -1318,21 +1318,21 @@ export default function EmployeeLeaveManagement() {
   return (
     <div className="space-y-5">
       {/* HEADER */}
-      <div className="bg-slate-800 text-white rounded-2xl p-5">
+      <div className="bg-purple-200 border border-purple-300 text-slate-800 rounded-2xl p-5">
         <div className="flex justify-between gap-4 flex-wrap">
           <div>
-            <h2 className="text-xl font-semibold">Leave Management</h2>
-            <p className="text-sm text-slate-300">
+            <h2 className="text-xl font-semibold text-slate-900">Leave Management</h2>
+            <p className="text-sm text-slate-600">
               Full Day · Half Day · Permission
             </p>
-            <p className="text-xs text-slate-300 mt-1">
+            <p className="text-xs text-slate-500 mt-1">
               Logged in: <span className="font-semibold">{EMP.name}</span> •{" "}
               {EMP.id}
             </p>
           </div>
           <button
             onClick={() => setCreateOpen(true)}
-            className="bg-white text-slate-800 px-4 py-2 rounded-lg flex gap-2 items-center"
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg flex gap-2 items-center hover:bg-purple-700 transition"
             type="button"
           >
             <Plus size={16} /> New Leave
@@ -1345,8 +1345,8 @@ export default function EmployeeLeaveManagement() {
               key={k}
               onClick={() => setStatusFilter(k)}
               className={`px-3 py-1 rounded-full border ${statusFilter === k
-                ? "bg-white text-slate-800"
-                : "bg-white/10 text-white"
+                ? "bg-purple-600 text-white border-purple-600"
+                : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
                 }`}
               type="button"
             >

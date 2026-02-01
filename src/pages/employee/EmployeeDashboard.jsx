@@ -154,12 +154,12 @@ const fmtOrDash = (value) => (value ? String(value) : "-");
 
 const calculateExperience = (expStr) => {
   if (!expStr || typeof expStr !== "string") return "-";
-  
+
   // If it doesn't contain a range separator, it might be an old duration string (e.g. "3 Years")
   if (!expStr.includes(" - ")) {
     return expStr || "-";
   }
-  
+
   const [fromPart, toPart] = expStr.split(" - ");
   if (!fromPart) return "-";
 
@@ -318,20 +318,20 @@ export default function EmployeeDashboard() {
 
       if (!empId) {
         if (cached?.fullName || cached?.employeeId) {
-        setEmployeeInfo((prev) => ({
-          ...prev,
-          name: cached.fullName || "",
-          id: cached.employeeId || "",
-          role: cached.designation || cached.role || prev.role || "",
-          dept: cached.department || cached.location || prev.dept || "",
-          manager:
-            cached.manager || cached.reporting_manager || prev.manager || "",
-          joiningDate:
-            cached.joiningDate || cached.joinDate || prev.joiningDate || "",
-          workMode:
-            cached.workMode || cached.work_mode || prev.workMode || "",
-          employeeType: cached.employeeType || prev.employeeType || "",
-        }));
+          setEmployeeInfo((prev) => ({
+            ...prev,
+            name: cached.fullName || "",
+            id: cached.employeeId || "",
+            role: cached.designation || cached.role || prev.role || "",
+            dept: cached.department || cached.location || prev.dept || "",
+            manager:
+              cached.manager || cached.reporting_manager || prev.manager || "",
+            joiningDate:
+              cached.joiningDate || cached.joinDate || prev.joiningDate || "",
+            workMode:
+              cached.workMode || cached.work_mode || prev.workMode || "",
+            employeeType: cached.employeeType || prev.employeeType || "",
+          }));
         }
         return;
       }
@@ -405,11 +405,11 @@ export default function EmployeeDashboard() {
             cached?.location ||
             "",
           employeeType: empRow?.employee_type || cached?.employeeType || "",
-          totalExperience: profileRow?.total_experience || 
-            (cached?.totalExpFrom ? `${cached.totalExpFrom} - ${cached.totalExpPresent ? "Present" : cached.totalExpTo || ""}` : "") || 
+          totalExperience: profileRow?.total_experience ||
+            (cached?.totalExpFrom ? `${cached.totalExpFrom} - ${cached.totalExpPresent ? "Present" : cached.totalExpTo || ""}` : "") ||
             cached?.totalExperience || "",
-          relevantExperience: profileRow?.relevant_experience || 
-            (cached?.relevantExpFrom ? `${cached.relevantExpFrom} - ${cached.relevantExpPresent ? "Present" : cached.relevantExpTo || ""}` : "") || 
+          relevantExperience: profileRow?.relevant_experience ||
+            (cached?.relevantExpFrom ? `${cached.relevantExpFrom} - ${cached.relevantExpPresent ? "Present" : cached.relevantExpTo || ""}` : "") ||
             cached?.relevantExperience || "",
         });
       } catch {
@@ -427,9 +427,9 @@ export default function EmployeeDashboard() {
           status: cached?.status || cached?.employee_status || prev.status || "",
           workMode:
             cached?.workMode || cached?.work_mode || prev.workMode || "",
-          totalExperience: (cached?.totalExpFrom ? `${cached.totalExpFrom} - ${cached.totalExpPresent ? "Present" : cached.totalExpTo || ""}` : "") || 
+          totalExperience: (cached?.totalExpFrom ? `${cached.totalExpFrom} - ${cached.totalExpPresent ? "Present" : cached.totalExpTo || ""}` : "") ||
             cached?.totalExperience || prev.totalExperience || "",
-          relevantExperience: (cached?.relevantExpFrom ? `${cached.relevantExpFrom} - ${cached.relevantExpPresent ? "Present" : cached.relevantExpTo || ""}` : "") || 
+          relevantExperience: (cached?.relevantExpFrom ? `${cached.relevantExpFrom} - ${cached.relevantExpPresent ? "Present" : cached.relevantExpTo || ""}` : "") ||
             cached?.relevantExperience || prev.relevantExperience || "",
         }));
       }
@@ -502,7 +502,7 @@ export default function EmployeeDashboard() {
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-extrabold text-slate-900">
-              Employee Dashboard
+              {employeeInfo.name ? `${employeeInfo.name}'s Dashboard` : "Employee Dashboard"}
             </h1>
             {/* <Badge tone="purple">Self Service</Badge> */}
           </div>
@@ -536,60 +536,40 @@ export default function EmployeeDashboard() {
 
       <div className="grid grid-cols-1 gap-4">
         <SectionCard
-          title="Job Information"
-          subtitle="Your core employment details"
-          action={<Badge tone="neutral">Profile</Badge>}
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {[
-              { label: "Employee ID", value: employeeInfo.id },
-              { label: "Designation", value: employeeInfo.role },
-              { label: "Department", value: employeeInfo.dept },
-              { label: "Reporting Manager", value: employeeInfo.manager },
-              { label: "Date of Joining", value: employeeInfo.joiningDate ? formatDDMMYYYY(employeeInfo.joiningDate) : "-" },
-              { label: "Work Mode", value: employeeInfo.workMode },
-              { label: "Total Experience", value: calculateExperience(employeeInfo.totalExperience) },
-              { label: "Relevant Experience", value: calculateExperience(employeeInfo.relevantExperience) },
-            ].map((item) => (
-              <div
-                key={item.label}
-                className="rounded-2xl border bg-slate-50 px-4 py-3"
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  {item.label}
-                </p>
-                <p className="mt-1 text-base font-bold text-slate-900">
-                  {fmtOrDash(item.value)}
-                </p>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-
-        <SectionCard
           title="Leave Details"
           subtitle="Absence types + recent requests"
           action={<Badge tone="info">Leave</Badge>}
         >
           {/* Absence type cards */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            {absenceGroups.map((group) => (
-              <button
-                key={group.id}
-                type="button"
-                onClick={() => setSelectedAbsenceGroup(group)}
-                className="rounded-2xl border bg-slate-50 px-4 py-6 text-center transition hover:bg-white hover:shadow-sm"
-              >
-                <div className="text-base font-extrabold text-slate-900">
-                  {group.title}
-                </div>
-                {group.items.length === 1 ? (
-                  <div className="mt-2 text-3xl font-extrabold text-slate-900">
-                    {formatLeaveTotal(group.items[0].remaining)}
+            {absenceGroups.map((group) => {
+              // Assign different light colors based on group id
+              const colorClasses = {
+                casual: "bg-emerald-50 border-emerald-200 hover:bg-emerald-100",
+                sick: "bg-blue-50 border-blue-200 hover:bg-blue-100",
+                other: "bg-amber-50 border-amber-200 hover:bg-amber-100",
+                emergency: "bg-rose-50 border-rose-200 hover:bg-rose-100",
+              };
+              const cardClass = colorClasses[group.id] || "bg-slate-50 border-slate-200 hover:bg-white";
+
+              return (
+                <button
+                  key={group.id}
+                  type="button"
+                  onClick={() => setSelectedAbsenceGroup(group)}
+                  className={`rounded-2xl border px-4 py-6 text-center transition hover:shadow-sm ${cardClass}`}
+                >
+                  <div className="text-base font-extrabold text-slate-900">
+                    {group.title}
                   </div>
-                ) : null}
-              </button>
-            ))}
+                  {group.items.length === 1 ? (
+                    <div className="mt-2 text-3xl font-extrabold text-slate-900">
+                      {formatLeaveTotal(group.items[0].remaining)}
+                    </div>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
 
           {/* Recent requests */}
@@ -663,6 +643,37 @@ export default function EmployeeDashboard() {
             >
               View all
             </GhostButton>
+          </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Job Information"
+          subtitle="Your core employment details"
+          action={<Badge tone="neutral">Profile</Badge>}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {[
+              { label: "Employee ID", value: employeeInfo.id },
+              { label: "Designation", value: employeeInfo.role },
+              { label: "Department", value: employeeInfo.dept },
+              { label: "Reporting Manager", value: employeeInfo.manager },
+              { label: "Date of Joining", value: employeeInfo.joiningDate ? formatDDMMYYYY(employeeInfo.joiningDate) : "-" },
+              { label: "Work Mode", value: employeeInfo.workMode },
+              { label: "Total Experience", value: calculateExperience(employeeInfo.totalExperience) },
+              { label: "Relevant Experience", value: calculateExperience(employeeInfo.relevantExperience) },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="rounded-2xl border bg-slate-50 px-4 py-3"
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  {item.label}
+                </p>
+                <p className="mt-1 text-base font-bold text-slate-900">
+                  {fmtOrDash(item.value)}
+                </p>
+              </div>
+            ))}
           </div>
         </SectionCard>
       </div>

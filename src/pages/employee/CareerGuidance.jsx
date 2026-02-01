@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { 
-  GraduationCap, 
-  User, 
-  Laptop, 
-  Code2, 
-  Users, 
-  ClipboardList, 
-  Grid3X3, 
-  BarChart3, 
+import {
+  GraduationCap,
+  User,
+  Laptop,
+  Code2,
+  Users,
+  ClipboardList,
+  Grid3X3,
+  BarChart3,
   Star,
   Briefcase,
   Search,
@@ -28,7 +28,7 @@ const CareerGuidance = () => {
         setLoading(true);
         const authRaw = localStorage.getItem("HRMSS_AUTH_SESSION");
         const auth = authRaw ? JSON.parse(authRaw) : null;
-        
+
         // Match the logic used in EmployeeDashboard.jsx for robust ID extraction
         const empId = String(auth?.employee_id || auth?.identifier || auth?.id || "").trim();
 
@@ -79,17 +79,17 @@ const CareerGuidance = () => {
 
   const designation = profile?.designation?.toLowerCase() || "";
   const department = profile?.department?.toLowerCase() || "";
-  
+
   const isBusinessDev =
     department.includes("business development") ||
     designation.includes("business development") ||
     designation.includes("bde");
 
   // Check if user is in a technology role (AI, Intern, Developer, UI/UX, etc.)
-  const isTechRole = 
-    designation.includes("ai") || 
-    designation.includes("intern") || 
-    designation.includes("developer") || 
+  const isTechRole =
+    designation.includes("ai") ||
+    designation.includes("intern") ||
+    designation.includes("developer") ||
     designation.includes("ui/ux") ||
     department.includes("technology") ||
     department.includes("engineering") ||
@@ -102,11 +102,11 @@ const CareerGuidance = () => {
     { icon: GraduationCap, color: "text-orange-500", title: "Business Development Interns", exp: "Final-year MBA / Any graduate with sales interest" },
   ] : !isTechRole ? [
     { icon: UserPlus, color: "text-purple-500", title: "Trainee IT Recruiter", exp: "Fresher" },
-    { icon: Phone, color: "text-blue-600", title: "IT Recruiter", exp: "> 1yr" },
-    { icon: UserCheck, color: "text-orange-500", title: "Talent Acquisition Executive", exp: "1 - 2.5yr" },
-    { icon: Search, color: "text-teal-500", title: "Talent Acquisition Specialist", exp: "3+" },
-    { icon: Users, color: "text-blue-500", title: "Talent Acquisition - Team Lead", exp: "4.5+" },
-    { icon: Briefcase, color: "text-purple-600", title: "Talent Acquisition - Manager", exp: "7+" },
+    { icon: Phone, color: "text-blue-600", title: "IT Recruiter", exp: "> 1 year" },
+    { icon: UserCheck, color: "text-orange-500", title: "Talent Acquisition Executive", exp: "1 - 2.5 years" },
+    { icon: Search, color: "text-teal-500", title: "Talent Acquisition Specialist", exp: "3+ years" },
+    { icon: Users, color: "text-blue-500", title: "Talent Acquisition - Team Lead", exp: "4.5+ years" },
+    { icon: Briefcase, color: "text-purple-600", title: "Talent Acquisition - Manager", exp: "7+ years" },
   ] : [
     { icon: GraduationCap, color: "text-purple-600", title: "Trainee Developer (Intern / Student)", exp: "0 to 6 months" },
     { icon: User, color: "text-blue-500", title: "Junior Developer (Fresher)", exp: "0 to 1 year" },
@@ -134,7 +134,7 @@ const CareerGuidance = () => {
               Designation & Experience Matrix
             </h1>
             <p className="text-slate-500 mt-2 font-medium">
-              Twite AI Technologies • <span className="text-purple-600 font-bold">{isBusinessDev ? "Business Development" : !isTechRole ? "Talent Acquisition" : "Technology"} Division</span>
+              Twite AI Technologies • <span className="text-purple-600 font-bold">{isBusinessDev ? "Business Development" : !isTechRole ? "Talent Acquisition" : "Technology"}</span>
             </p>
           </div>
         </div>
@@ -154,7 +154,7 @@ const CareerGuidance = () => {
               const currentStep = matrixData.slice().reverse()[i];
               const isSeniorSoftwareDev = currentStep?.title.toLowerCase().includes("senior software developer");
               const rungNumber = String(rungCount - i).padStart(2, "0");
-              
+
               return (
                 <div
                   key={i}
@@ -163,14 +163,14 @@ const CareerGuidance = () => {
                 >
                   {/* Number on left side of rung */}
                   <span className="text-white font-bold text-xs">{rungNumber}</span>
-                  
+
                   {/* Employee position indicator on ladder rung */}
                   {isSeniorSoftwareDev && (
                     <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center border-2 border-white shadow-md">
                       <User size={12} className="text-white" />
                     </div>
                   )}
-                  
+
                   {/* Empty space on right if no employee indicator */}
                   {!isSeniorSoftwareDev && <div className="w-6 h-6"></div>}
                 </div>
@@ -231,8 +231,8 @@ const CareerGuidance = () => {
       {/* Footer Branding */}
       <div className="mt-16 text-center">
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-50 border border-slate-100">
-           <Star className="text-yellow-500" size={12} fill="currentColor" />
-           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">TWITE HRMS PROFESSIONAL GROWTH FRAMEWORK</p>
+          <Star className="text-yellow-500" size={12} fill="currentColor" />
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">TWITE HRMS PROFESSIONAL GROWTH FRAMEWORK</p>
         </div>
       </div>
     </div>

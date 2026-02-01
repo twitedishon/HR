@@ -627,7 +627,7 @@ export default function WorkAnniversary() {
             <div className="wa-hero-content">
               <header className="wa-header">
                 <div>
-                  <p className="wa-eyebrow">HR workspace</p>
+
                   <h1 className="wa-title">Work Anniversary</h1>
                   <p className="wa-sub">
                     Track service milestones, upcoming celebrations, and team tenure at a

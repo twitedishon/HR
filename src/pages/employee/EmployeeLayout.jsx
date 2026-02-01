@@ -22,10 +22,9 @@ const SideItem = ({ to, icon: Icon, label, end, isCollapsed }) => (
     end={end}
     className={({ isActive }) =>
 
-      `flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-        isActive
-          ? "bg-purple-700 text-white shadow"
-          : "text-gray-700 hover:bg-purple-50 hover:text-purple-700"
+      `flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive
+        ? "bg-purple-700 text-white shadow"
+        : "text-gray-700 hover:bg-purple-50 hover:text-purple-700"
       }`
     }
   >
@@ -59,7 +58,7 @@ export default function EmployeeLayout() {
   const handleLogout = () => {
     try {
       sessionStorage.removeItem(DOCS_AUTH_KEY);
-    } catch {}
+    } catch { }
     localStorage.removeItem(DOCS_AUTH_KEY);
     navigate("/login");
   };
@@ -68,9 +67,8 @@ export default function EmployeeLayout() {
     <div className="min-h-screen bg-gray-50 flex">
       <aside
 
-        className={`bg-white border-r sticky top-0 h-screen transition-all duration-300 ease-in-out ${
-          isSidebarOpen ? "w-[280px]" : "w-[72px]"
-        }`}
+        className={`bg-white border-r sticky top-0 h-screen transition-all duration-300 ease-in-out ${isSidebarOpen ? "w-[280px]" : "w-[72px]"
+          }`}
       >
         <div className="h-full flex flex-col overflow-hidden">
           <div className={`p-5 border-b flex items-center gap-3 ${isSidebarOpen ? 'justify-between' : 'justify-center'}`}>
@@ -122,16 +120,14 @@ export default function EmployeeLayout() {
               >
                 <Menu size={18} />
               </button>
-              <div className="text-sm text-gray-500">Employee Workspace</div>
             </div>
             <div className="flex items-center gap-2">
               <NavLink
                 to="notifications"
                 className={({ isActive }) =>
-                  `inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                    isActive
-                      ? "bg-gray-900 text-white shadow"
-                      : "text-gray-700 hover:bg-gray-100"
+                  `inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${isActive
+                    ? "bg-gray-900 text-white shadow"
+                    : "text-gray-700 hover:bg-gray-100"
                   }`
                 }
               >
@@ -141,10 +137,9 @@ export default function EmployeeLayout() {
               <NavLink
                 to="profile"
                 className={({ isActive }) =>
-                  `inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                    isActive
-                      ? "bg-gray-900 text-white shadow"
-                      : "text-gray-700 hover:bg-gray-100"
+                  `inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${isActive
+                    ? "bg-gray-900 text-white shadow"
+                    : "text-gray-700 hover:bg-gray-100"
                   }`
                 }
               >
