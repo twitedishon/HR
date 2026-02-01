@@ -87,9 +87,8 @@ function StatCard({ icon: Icon, label, value, tone = "purple", onClick, active }
     <Tag
       type={onClick ? "button" : undefined}
       onClick={onClick}
-      className={`rounded-3xl bg-white/80 backdrop-blur border border-white shadow-sm px-6 py-5 flex items-center gap-4 ${
-        onClick ? "cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md" : ""
-      } ${active ? "ring-2 ring-amber-200" : ""}`}
+      className={`rounded-3xl bg-white/80 backdrop-blur border border-white shadow-sm px-6 py-5 flex items-center gap-4 ${onClick ? "cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md" : ""
+        } ${active ? "ring-2 ring-amber-200" : ""}`}
     >
       <div
         className={`h-11 w-11 rounded-2xl flex items-center justify-center ${tones[tone]}`}
@@ -143,7 +142,8 @@ export default function PeopleDirectory() {
             official_email,
             personal_email,
             mobile_number,
-            location
+            location,
+            avatar_url
           `
           )
           .eq("profile_completed", true)
@@ -162,6 +162,7 @@ export default function PeopleDirectory() {
             department: r.location || "-", // optional: using location (since dept not in table)
             email: r.official_email || r.personal_email || "",
             phone: r.mobile_number || "",
+            avatar: r.avatar_url || "",
           }))
           .filter((x) => x.id); // safe
 
@@ -304,10 +305,9 @@ export default function PeopleDirectory() {
                           type="button"
                           onClick={() => setSelected(emp)}
                           className={`w-full text-left px-5 py-4 flex items-center gap-4 transition relative
-                            ${
-                              active
-                                ? "bg-gradient-to-r from-[#FAD2D9] to-[#F8C7C9]"
-                                : "hover:bg-white"
+                            ${active
+                              ? "bg-gradient-to-r from-[#FAD2D9] to-[#F8C7C9]"
+                              : "hover:bg-white"
                             }
                           `}
                         >
@@ -318,15 +318,22 @@ export default function PeopleDirectory() {
 
                           {/* Avatar */}
                           <div
-                            className={`h-12 w-12 rounded-full grid place-items-center font-bold text-sm
-                            ${
-                              active
+                            className={`h-12 w-12 rounded-full grid place-items-center font-bold text-sm overflow-hidden
+                            ${active
                                 ? "bg-orange-200 text-orange-800"
                                 : "bg-[#7C3AED] text-white"
-                            }
+                              }
                           `}
                           >
-                            {initials(emp.name)}
+                            {emp.avatar ? (
+                              <img
+                                src={emp.avatar}
+                                alt={emp.name}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              initials(emp.name)
+                            )}
                           </div>
 
                           {/* Name + meta */}
@@ -376,8 +383,16 @@ export default function PeopleDirectory() {
               <span className="absolute top-10 right-28 h-6 w-6 rounded-full bg-white/20" />
 
               <div className="relative flex items-center gap-4">
-                <div className="h-16 w-16 rounded-full bg-white/20 grid place-items-center text-white font-extrabold text-lg">
-                  {initials(selected?.name || "")}
+                <div className="h-16 w-16 rounded-full bg-white/20 grid place-items-center text-white font-extrabold text-lg overflow-hidden">
+                  {selected?.avatar ? (
+                    <img
+                      src={selected.avatar}
+                      alt={selected.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    initials(selected?.name || "")
+                  )}
                 </div>
                 <div className="text-white min-w-0">
                   <div className="text-xl font-bold truncate">
@@ -437,7 +452,7 @@ export default function PeopleDirectory() {
                 />
               </div>
 
-             
+
             </div>
           </div>
         </div>
