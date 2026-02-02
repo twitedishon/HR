@@ -31,7 +31,7 @@ export default function ManagerApproverDocuments() {
 
   return (
     <DocumentManager
-      title="Manager Documents"
+      title="Founder Documents"
       subtitle="Upload and manage team-related documents"
       accent="purple"
       role="manager"

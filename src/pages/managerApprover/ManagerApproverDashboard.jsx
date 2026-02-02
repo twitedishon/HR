@@ -477,7 +477,7 @@ export default function ManagerDashboard() {
           const roleLabel = (r) => {
             if (r === "admin-head") return "Admin Head";
             if (r === "admin") return "Admin";
-            if (r === "manager") return "Manager";
+            if (r === "manager") return "Founder";
             if (r === "hr") return "HR";
             return r || "-";
           };
@@ -640,7 +640,7 @@ export default function ManagerDashboard() {
               Welcome back, {session.name}
             </p>
             <h1 className="text-2xl font-bold text-slate-900">
-              Manager Dashboard
+              Founder Dashboard
             </h1>
           </div>
 

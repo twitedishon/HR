@@ -106,7 +106,6 @@ const Navbar = ({ isSidebarOpen = true, onToggleSidebar }) => {
           <UserRound size={16} />
           My Profile
         </NavLink>
-        <span className="text-gray-500">Welcome, Admin</span>
         <button
           onClick={handleLogout}
           className="px-3 py-1 text-xs rounded-md border border-gray-300 hover:bg-gray-100"

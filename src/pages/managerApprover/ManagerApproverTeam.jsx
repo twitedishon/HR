@@ -73,7 +73,7 @@ function Modal({ open, onClose, emp }) {
             <Row icon={BriefcaseBusiness} label="Job Role" value={emp.designation} />
             <Row icon={BriefcaseBusiness} label="Employee Type" value={emp.employeeType} />
             <Row icon={UserRound} label="Gender" value={emp.gender} />
-            <Row icon={UserRound} label="Reporting Manager" value={emp.reportingManager} />
+            <Row icon={UserRound} label="Reporting Founder" value={emp.reportingManager} />
             <Row icon={CalendarDays} label="Join Date" value={emp.joinDate} />
             <Row icon={MapPin} label="Location" value={emp.location} />
           </div>

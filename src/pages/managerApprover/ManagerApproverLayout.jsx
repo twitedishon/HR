@@ -111,10 +111,9 @@ export default function ManagerLayout() {
           <div className={`p-5 border-b border-white/10 flex items-center gap-3 ${isSidebarOpen ? 'justify-between' : 'justify-center'}`}>
             {isSidebarOpen ? (
               <div>
-                <div className="text-xl font-extrabold leading-none">Manager</div>
-                <div className="text-[10px] text-indigo-100/90 mt-1 flex items-center gap-2 uppercase font-bold tracking-wider">
-                  <Shield size={12} />
-                  {approver ? "Approver Access" : "Viewer Access"}
+                <div className="text-3xl font-extrabold leading-none">TWITE</div>
+                <div className="text-sm text-indigo-100/90 mt-1 flex items-center gap-2 uppercase font-bold tracking-wider">
+                  HRMS
                 </div>
               </div>
             ) : (
@@ -153,7 +152,7 @@ export default function ManagerLayout() {
       <main className="flex-1">
         <header className="bg-white border-b sticky top-0 z-40">
           <div className="px-6 py-4 flex flex-col gap-1">
-            <div className="text-xs uppercase tracking-wide text-slate-500">Manager Portal</div>
+
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"

@@ -115,6 +115,14 @@ const formatTimeLabel = (value) => {
   return d.toLocaleString();
 };
 
+const formatMessageDates = (text) => {
+  if (!text) return "";
+  // Formats "YYYY-MM-DD" to "DD/MM/YYYY" inside strings
+  return text.replace(/(\d{4})-(\d{2})-(\d{2})/g, (match, y, m, d) => {
+    return `${d}/${m}/${y}`;
+  });
+};
+
 const tone = {
   success: {
     pill: "bg-emerald-50 text-emerald-700 ring-emerald-200",
@@ -124,11 +132,11 @@ const tone = {
     bg: "bg-emerald-50/60",
   },
   warning: {
-    pill: "bg-amber-50 text-amber-800 ring-amber-200",
-    icon: "text-amber-600",
-    border: "border-amber-100",
-    dot: "bg-amber-500",
-    bg: "bg-amber-50/60",
+    pill: "bg-rose-50 text-rose-800 ring-rose-200",
+    icon: "text-rose-600",
+    border: "border-rose-100",
+    dot: "bg-rose-500",
+    bg: "bg-rose-50/60",
   },
   info: {
     pill: "bg-blue-50 text-blue-700 ring-blue-200",
@@ -145,6 +153,11 @@ const typeIcon = {
   info: Info,
 };
 
+const typeLabel = (key) => {
+  if (key === "success") return "APPROVED";
+  if (key === "warning") return "REJECTED";
+  return String(key).toUpperCase();
+};
 
 function Chip({ active, children, onClick }) {
   return (
@@ -265,7 +278,7 @@ function NotificationRow({
                     t.pill
                   )}
                 >
-                  {String(typeKey).toUpperCase()}
+                  {typeLabel(typeKey)}
                 </span>
 
                 <span
@@ -291,15 +304,7 @@ function NotificationRow({
               <p className="mt-2 text-sm font-bold text-slate-900">{n.title}</p>
               <p className="mt-1 text-sm text-slate-700">{n.detail}</p>
 
-              <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-600">
-                <ShieldCheck size={14} />
-                HR Notifications
-                <span className="mx-1 text-slate-300">•</span>
-                <span className="inline-flex items-center gap-1">
-                  <Clock3 size={12} />
-                  {n.time}
-                </span>
-              </div>
+
             </div>
 
             <div className="flex flex-col items-end gap-2 shrink-0">
@@ -412,7 +417,7 @@ export default function HrNotifications() {
         ...adminData.map((n) => ({
           id: `g-${n.id}`,
           title: n.title || "-",
-          detail: n.detail || "",
+          detail: formatMessageDates(n.detail || ""),
           type: n.type || "info",
           source: n.source || "-",
           route: n.route || "",
@@ -423,7 +428,7 @@ export default function HrNotifications() {
         ...personalData.map((n) => ({
           id: `p-${n.id}`,
           title: n.title || "-",
-          detail: n.message || "",
+          detail: formatMessageDates(n.message || ""),
           type: n.type || "info",
           source: "LeaveManagement",
           route: n.route || "/hr-dashboard/leave-management",
@@ -629,10 +634,10 @@ export default function HrNotifications() {
               All ({counts.total})
             </Chip>
             <Chip active={type === "success"} onClick={() => setType("success")}>
-              Success ({counts.success})
+              Approved ({counts.success})
             </Chip>
             <Chip active={type === "warning"} onClick={() => setType("warning")}>
-              Warning ({counts.warning})
+              Rejected ({counts.warning})
             </Chip>
             <Chip active={type === "info"} onClick={() => setType("info")}>
               Info ({counts.info})

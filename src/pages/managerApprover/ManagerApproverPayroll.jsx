@@ -87,7 +87,7 @@ export default function ManagerPayroll() {
           gross: toNum(row.basic_salary) + toNum(row.hra) + toNum(row.allowances),
           deductionSplit: splitDeductions(row.deductions),
           status: s?.published ? "Approved" : "Pending Approval",
-          remarks: s?.note || "Awaiting manager review",
+          remarks: s?.note || "Awaiting founder review",
           created_at: s?.created_at || row.created_at || new Date().toISOString(),
           isPublished: !!s?.published
         };
@@ -142,7 +142,7 @@ export default function ManagerPayroll() {
         month,
         employee_id: employeeId,
         published: true,
-        note: "Approved by Manager",
+        note: "Approved by Founder",
       });
 
       await fetchBatches();
@@ -165,7 +165,7 @@ export default function ManagerPayroll() {
         month,
         employee_id: employeeId,
         published: false,
-        note: "Rejected by Manager",
+        note: "Rejected by Founder",
       });
 
       await fetchBatches();
@@ -183,7 +183,7 @@ export default function ManagerPayroll() {
           <Lock className="text-indigo-400" />
         </div>
         <div className="flex-1">
-          <p className="text-xs font-bold text-indigo-400 uppercase tracking-widest">Manager Portal</p>
+          <p className="text-xs font-bold text-indigo-400 uppercase tracking-widest">Founder Portal</p>
           <p className="text-xl font-black">Payroll Approval Center</p>
         </div>
         <span className="hidden sm:inline-flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full text-[10px] font-bold text-emerald-400 uppercase tracking-tighter">
@@ -195,15 +195,15 @@ export default function ManagerPayroll() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center">
-                <FileSpreadsheet size={18} className="text-indigo-600" />
+              <FileSpreadsheet size={18} className="text-indigo-600" />
             </div>
             <div>
-                <h3 className="text-sm font-bold text-slate-900">Payroll Runs</h3>
-                <p className="text-[10px] text-slate-500 font-semibold uppercase">Real-time database records</p>
+              <h3 className="text-sm font-bold text-slate-900">Payroll Runs</h3>
+              <p className="text-[10px] text-slate-500 font-semibold uppercase">Real-time database records</p>
             </div>
           </div>
-          <button 
-            onClick={fetchBatches} 
+          <button
+            onClick={fetchBatches}
             disabled={loading}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-600 hover:bg-indigo-50 transition"
           >
@@ -218,132 +218,129 @@ export default function ManagerPayroll() {
         ) : null}
 
         {loading ? (
-            <div className="py-12 text-center">
-                <Loader2 size={32} className="animate-spin mx-auto text-indigo-600 mb-2" />
-                <p className="text-sm text-slate-500 font-medium">Fetching payroll batches...</p>
-            </div>
+          <div className="py-12 text-center">
+            <Loader2 size={32} className="animate-spin mx-auto text-indigo-600 mb-2" />
+            <p className="text-sm text-slate-500 font-medium">Fetching payroll batches...</p>
+          </div>
         ) : error ? (
-            <div className="rounded-2xl bg-rose-50 border border-rose-100 p-4 text-center">
-                <XCircle size={24} className="mx-auto text-rose-600 mb-2" />
-                <p className="text-sm text-rose-700 font-bold">{error}</p>
-                <button onClick={fetchBatches} className="mt-2 text-xs font-bold text-rose-600 underline">Try again</button>
-            </div>
+          <div className="rounded-2xl bg-rose-50 border border-rose-100 p-4 text-center">
+            <XCircle size={24} className="mx-auto text-rose-600 mb-2" />
+            <p className="text-sm text-rose-700 font-bold">{error}</p>
+            <button onClick={fetchBatches} className="mt-2 text-xs font-bold text-rose-600 underline">Try again</button>
+          </div>
         ) : batches.length === 0 ? (
-            <div className="py-12 text-center rounded-3xl border-2 border-dashed border-slate-100 bg-slate-50/50">
-                <Receipt size={40} className="mx-auto text-slate-300 mb-3" />
-                <p className="text-sm text-slate-500 font-bold">No Payroll Data Detected</p>
-                <p className="text-xs text-slate-400 mt-1">When HR generates payroll, it will appear here for your review.</p>
-            </div>
+          <div className="py-12 text-center rounded-3xl border-2 border-dashed border-slate-100 bg-slate-50/50">
+            <Receipt size={40} className="mx-auto text-slate-300 mb-3" />
+            <p className="text-sm text-slate-500 font-bold">No Payroll Data Detected</p>
+            <p className="text-xs text-slate-400 mt-1">When HR generates payroll, it will appear here for your review.</p>
+          </div>
         ) : (
-            <div className="grid gap-4">
-              {batches.map((row) => (
-                <div
-                  key={`${row.month}-${row.id}`}
-                  className={`rounded-2xl border transition-all p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-                    row.status === "Approved"
-                      ? "bg-emerald-50/30 border-emerald-100"
-                      : "bg-white border-slate-200 hover:border-indigo-200 hover:shadow-md"
+          <div className="grid gap-4">
+            {batches.map((row) => (
+              <div
+                key={`${row.month}-${row.id}`}
+                className={`rounded-2xl border transition-all p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${row.status === "Approved"
+                    ? "bg-emerald-50/30 border-emerald-100"
+                    : "bg-white border-slate-200 hover:border-indigo-200 hover:shadow-md"
                   }`}
-                >
-                  <div className="flex items-start gap-4">
-                    <div
-                      className={`h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 ${
-                        row.status === "Approved" ? "bg-emerald-100 text-emerald-600" : "bg-amber-100 text-amber-600"
+              >
+                <div className="flex items-start gap-4">
+                  <div
+                    className={`h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 ${row.status === "Approved" ? "bg-emerald-100 text-emerald-600" : "bg-amber-100 text-amber-600"
                       }`}
-                    >
-                      <CalendarClock month={row.month} />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-black text-slate-900 text-lg">{row.month}</p>
-                        <span
-                          className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
-                            row.status === "Approved"
-                              ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                              : row.status === "Pending Approval"
-                                ? "bg-amber-100 text-amber-700 border-amber-200"
-                                : "bg-slate-100 text-slate-700 border-slate-200"
-                          }`}
-                        >
-                          {row.status}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setOpenDetailsId(openDetailsId === row.id ? "" : row.id)}
-                          className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 px-2 py-1 border border-indigo-100 rounded-lg hover:bg-indigo-50"
-                        >
-                          <Eye size={12} /> {openDetailsId === row.id ? "Hide" : "Details"}
-                        </button>
-                      </div>
-                      <p className="text-sm text-slate-500 font-medium mt-0.5">
-                        Employee: <span className="font-bold text-slate-900">{row.employeeId || "-"}</span>
-                      </p>
-                      <p className="text-sm text-slate-500 font-medium">
-                        Net Pay: <span className="font-bold text-emerald-700">{formatInr(row.net)}</span>
-                      </p>
-                      <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-tighter">
-                        Last Update: {formatDDMMYYYY(row.created_at)}
-                      </p>
-                      {openDetailsId === row.id ? (
-                        <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-[11px] text-slate-600 space-y-2">
-                          <p className="font-semibold text-slate-700">Payroll Details</p>
-                          <div className="grid grid-cols-2 gap-2">
-                            <DetailItem label="Basic" value={formatInr(row.basic)} />
-                            <DetailItem label="HRA" value={formatInr(row.hra)} />
-                            <DetailItem label="Allowances" value={formatInr(row.allowances)} />
-                            <DetailItem label="Gross Salary" value={formatInr(row.gross)} />
-                            <DetailItem label="Loan Deduction" value={formatInr(row.deductionSplit.loan)} />
-                            <DetailItem label="Salary Advance Deduction" value={formatInr(row.deductionSplit.salaryAdvance)} />
-                            <DetailItem label="Leave Deduction" value={formatInr(row.deductionSplit.leave)} />
-                            <DetailItem label="Total Deductions" value={formatInr(row.deductions)} />
-                            <DetailItem label="Net Salary" value={formatInr(row.net)} emphasize />
-                          </div>
-                          <p className="text-[10px] text-slate-500">
-                            Net Salary = Gross Salary - Deductions
-                          </p>
-                          <p className="text-[10px] text-slate-500">
-                            Remarks: <span className="font-bold text-slate-900">{row.remarks}</span>
-                          </p>
-                        </div>
-                      ) : null}
-                    </div>
+                  >
+                    <CalendarClock month={row.month} />
                   </div>
-
-                  <div className="flex items-center gap-2 sm:self-center self-end">
-                    {row.status === "Pending Approval" ? (
-                      <>
-                        <button
-                          onClick={() => handleApprove(row.month, row.employeeId)}
-                          disabled={actionLoading}
-                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl transition shadow-lg shadow-indigo-200 disabled:opacity-50"
-                        >
-                          <CheckCircle size={14} /> APPROVE
-                        </button>
-                        <button
-                          onClick={() => handleReject(row.month, row.employeeId)}
-                          disabled={actionLoading}
-                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-black rounded-xl transition disabled:opacity-50"
-                        >
-                          <XCircle size={14} /> REJECT
-                        </button>
-                        {!supportsEmployeeStatus ? (
-                          <p className="text-[10px] text-amber-700 font-semibold">
-                            Add an `employee_id` column to hrmss_payslip_records for per-employee approvals.
-                          </p>
-                        ) : null}
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-end">
-                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">
-                          Finalized
-                        </span>
-                        <p className="text-[9px] text-slate-400 font-bold mt-1">READY FOR PAYSLIP DISTRIBUTION</p>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-black text-slate-900 text-lg">{row.month}</p>
+                      <span
+                        className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${row.status === "Approved"
+                            ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                            : row.status === "Pending Approval"
+                              ? "bg-amber-100 text-amber-700 border-amber-200"
+                              : "bg-slate-100 text-slate-700 border-slate-200"
+                          }`}
+                      >
+                        {row.status}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setOpenDetailsId(openDetailsId === row.id ? "" : row.id)}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 px-2 py-1 border border-indigo-100 rounded-lg hover:bg-indigo-50"
+                      >
+                        <Eye size={12} /> {openDetailsId === row.id ? "Hide" : "Details"}
+                      </button>
+                    </div>
+                    <p className="text-sm text-slate-500 font-medium mt-0.5">
+                      Employee: <span className="font-bold text-slate-900">{row.employeeId || "-"}</span>
+                    </p>
+                    <p className="text-sm text-slate-500 font-medium">
+                      Net Pay: <span className="font-bold text-emerald-700">{formatInr(row.net)}</span>
+                    </p>
+                    <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-tighter">
+                      Last Update: {formatDDMMYYYY(row.created_at)}
+                    </p>
+                    {openDetailsId === row.id ? (
+                      <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-[11px] text-slate-600 space-y-2">
+                        <p className="font-semibold text-slate-700">Payroll Details</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <DetailItem label="Basic" value={formatInr(row.basic)} />
+                          <DetailItem label="HRA" value={formatInr(row.hra)} />
+                          <DetailItem label="Allowances" value={formatInr(row.allowances)} />
+                          <DetailItem label="Gross Salary" value={formatInr(row.gross)} />
+                          <DetailItem label="Loan Deduction" value={formatInr(row.deductionSplit.loan)} />
+                          <DetailItem label="Salary Advance Deduction" value={formatInr(row.deductionSplit.salaryAdvance)} />
+                          <DetailItem label="Leave Deduction" value={formatInr(row.deductionSplit.leave)} />
+                          <DetailItem label="Total Deductions" value={formatInr(row.deductions)} />
+                          <DetailItem label="Net Salary" value={formatInr(row.net)} emphasize />
+                        </div>
+                        <p className="text-[10px] text-slate-500">
+                          Net Salary = Gross Salary - Deductions
+                        </p>
+                        <p className="text-[10px] text-slate-500">
+                          Remarks: <span className="font-bold text-slate-900">{row.remarks}</span>
+                        </p>
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 </div>
-              ))}
-            </div>
+
+                <div className="flex items-center gap-2 sm:self-center self-end">
+                  {row.status === "Pending Approval" ? (
+                    <>
+                      <button
+                        onClick={() => handleApprove(row.month, row.employeeId)}
+                        disabled={actionLoading}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl transition shadow-lg shadow-indigo-200 disabled:opacity-50"
+                      >
+                        <CheckCircle size={14} /> APPROVE
+                      </button>
+                      <button
+                        onClick={() => handleReject(row.month, row.employeeId)}
+                        disabled={actionLoading}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-black rounded-xl transition disabled:opacity-50"
+                      >
+                        <XCircle size={14} /> REJECT
+                      </button>
+                      {!supportsEmployeeStatus ? (
+                        <p className="text-[10px] text-amber-700 font-semibold">
+                          Add an `employee_id` column to hrmss_payslip_records for per-employee approvals.
+                        </p>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">
+                        Finalized
+                      </span>
+                      <p className="text-[9px] text-slate-400 font-bold mt-1">READY FOR PAYSLIP DISTRIBUTION</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
@@ -361,13 +358,13 @@ function DetailItem({ label, value, emphasize = false }) {
 }
 
 function CalendarClock({ month }) {
-    const [m, y] = month.split("-");
-    const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-    const monthIndex = parseInt(m) - 1;
-    return (
-        <div className="text-center leading-none">
-            <p className="text-[10px] font-black opacity-60 uppercase">{monthNames[monthIndex] || m}</p>
-            <p className="text-lg font-black">{y?.slice(-2)}</p>
-        </div>
-    );
+  const [m, y] = month.split("-");
+  const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  const monthIndex = parseInt(m) - 1;
+  return (
+    <div className="text-center leading-none">
+      <p className="text-[10px] font-black opacity-60 uppercase">{monthNames[monthIndex] || m}</p>
+      <p className="text-lg font-black">{y?.slice(-2)}</p>
+    </div>
+  );
 }

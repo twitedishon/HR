@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Check, Clock4, Eye, Shield } from "lucide-react";
+import { AlertCircle, Check, Clock4, Eye, LayoutGrid, Shield, X } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import { formatDDMMYYYY, formatTimeHHMM } from "../../lib/dateUtils";
 
@@ -66,7 +66,7 @@ const fmtRange = (from, to) => {
 export default function ManagerApprovals() {
   // session should contain at least: { name, role/access, email, id }
   const rawSession = getManagerSession() || {
-    name: "Manager",
+    name: "Founder",
 
     role: "manager",
     access: "approver",
@@ -86,6 +86,7 @@ export default function ManagerApprovals() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [filterStatus, setFilterStatus] = useState("All"); // All, Pending, Approved
 
   /* ---------------- Resolve manager id (if missing) ---------------- */
   const resolveManagerIdIfNeeded = async () => {
@@ -119,7 +120,7 @@ export default function ManagerApprovals() {
     if (!mgrId) {
       setRequests([]);
       setLoading(false);
-      setErr("Manager id not found. (session.id or session.email needed)");
+      setErr("Founder id not found. (session.id or session.email needed)");
       return;
     }
 
@@ -223,8 +224,18 @@ export default function ManagerApprovals() {
   const metrics = useMemo(() => {
     const pending = requests.filter((r) => r.status === "Pending").length;
     const approved = requests.filter((r) => r.status === "Approved").length;
-    return { pending, approved };
+    const rejected = requests.filter((r) => r.status === "Rejected").length;
+    return { pending, approved, rejected };
   }, [requests]);
+
+  const filteredRequests = useMemo(() => {
+    if (filterStatus === "All") return requests;
+    return requests.filter((r) => r.status === filterStatus);
+  }, [requests, filterStatus]);
+
+  const toggleFilter = (status) => {
+    setFilterStatus((prev) => (prev === status ? "All" : status));
+  };
 
   /* ---------------- Approve / Reject ---------------- */
   const handleAction = async (rowId, nextStatus) => {
@@ -238,7 +249,7 @@ export default function ManagerApprovals() {
       status: nextStatus,
       decided_at: new Date().toISOString().slice(0, 10),
       decided_by_id: managerId ? String(managerId) : String(session.id || ""),
-      decided_by_name: session.name || "Manager",
+      decided_by_name: session.name || "Founder",
 
     };
 
@@ -258,7 +269,7 @@ export default function ManagerApprovals() {
           .update({
             status: nextStatus,
             decided_at: new Date().toISOString().slice(0, 10),
-            decided_by_name: session.name || "Manager",
+            decided_by_name: session.name || "Founder",
           })
           .eq("admin_id", requestRecord.ownerId)
           .eq("from_date", requestRecord.fromDate)
@@ -338,7 +349,7 @@ export default function ManagerApprovals() {
 
         // Notify the HR who submitted the request
         await notifyHRAboutDecision({
-          managerName: session.name || "Manager",
+          managerName: session.name || "Founder",
           employeeName: requestRecord.ownerName || "HR",
           leaveType: requestRecord.leaveType || "Leave",
           status: nextStatus,
@@ -364,35 +375,49 @@ export default function ManagerApprovals() {
           <Shield size={18} /> Leave Approvals
         </div>
 
-        <p className="text-sm text-indigo-800/80">
 
-          Two managers sign in with separate IDs. Only the approver can approve
-          or reject; the second manager has read-only visibility.
-        </p>
+
 
         <div className="flex flex-wrap items-center gap-3 text-xs">
-          <span className="inline-flex items-center gap-1 bg-white px-3 py-1 rounded-full text-indigo-800 font-semibold border border-indigo-200">
-            <Clock4 size={14} /> Pending: {metrics.pending}
-          </span>
-
-          <span className="inline-flex items-center gap-1 bg-emerald-100 px-3 py-1 rounded-full text-emerald-700 font-semibold border border-emerald-200">
-            <Check size={14} /> Approved: {metrics.approved}
-          </span>
-
-          <span
-            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full font-semibold ${canAct
-              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-              : "bg-slate-100 text-slate-600"
+          <button
+            onClick={() => setFilterStatus("All")}
+            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full font-semibold border transition-all ${filterStatus === "All"
+              ? "bg-indigo-100 text-indigo-800 border-indigo-300 ring-2 ring-indigo-200"
+              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
               }`}
           >
-            Role: {canAct ? "Approver" : "View only"}
-          </span>
+            <LayoutGrid size={14} /> All: {requests.length}
+          </button>
 
-          {managerId ? (
-            <span className="inline-flex items-center gap-1 bg-white px-3 py-1 rounded-full text-slate-700 font-semibold border border-slate-200">
-              Manager ID: {String(managerId).slice(0, 8)}…
-            </span>
-          ) : null}
+          <button
+            onClick={() => toggleFilter("Pending")}
+            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full font-semibold border transition-all ${filterStatus === "Pending"
+              ? "bg-amber-100 text-amber-800 border-amber-300 ring-2 ring-amber-200"
+              : "bg-white text-indigo-800 border-indigo-200 hover:bg-indigo-50"
+              }`}
+          >
+            <Clock4 size={14} /> Pending: {metrics.pending}
+          </button>
+
+          <button
+            onClick={() => toggleFilter("Approved")}
+            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full font-semibold border transition-all ${filterStatus === "Approved"
+              ? "bg-emerald-100 text-emerald-800 border-emerald-300 ring-2 ring-emerald-200"
+              : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+              }`}
+          >
+            <Check size={14} /> Approved: {metrics.approved}
+          </button>
+
+          <button
+            onClick={() => toggleFilter("Rejected")}
+            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full font-semibold border transition-all ${filterStatus === "Rejected"
+              ? "bg-rose-100 text-rose-800 border-rose-300 ring-2 ring-rose-200"
+              : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+              }`}
+          >
+            <X size={14} /> Rejected: {metrics.rejected}
+          </button>
         </div>
       </div>
 
@@ -409,12 +434,12 @@ export default function ManagerApprovals() {
           <div className="rounded-2xl border p-4 bg-white text-sm text-slate-600">
             Loading…
           </div>
-        ) : requests.length === 0 ? (
+        ) : filteredRequests.length === 0 ? (
           <div className="rounded-2xl border p-4 bg-white text-sm text-slate-600">
-            No requests found for this manager.
+            No requests found for this filter.
           </div>
         ) : (
-          requests.map((req) => {
+          filteredRequests.map((req) => {
             const showTime = needsTime(req.mode);
 
             return (
@@ -476,15 +501,15 @@ export default function ManagerApprovals() {
                   </p>
 
                   <p className="text-xs text-slate-500 mt-1">
-                    Request To: Manager • {req.requestToName || "-"}
+                    Request To: Founder • {req.requestToName || "-"}
                   </p>
                 </div>
 
                 {req.decidedBy ? (
                   <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center gap-2">
 
-                    <Check size={14} /> Updated by {req.decidedBy}{" "}
-                    {req.decidedAt ? `at ${req.decidedAt}` : ""}
+                    <Check size={14} /> Approved by {req.decidedBy}{" "}
+                    {req.decidedAt ? `at ${formatDDMMYYYY(req.decidedAt)}` : ""}
                   </div>
                 ) : null}
 
@@ -528,8 +553,8 @@ export default function ManagerApprovals() {
           <AlertCircle size={16} className="text-amber-600 mt-0.5" />
           <div>
 
-            You are logged in as the view-only manager. To approve or reject,
-            sign in with the approver manager ID.
+            You are logged in as the view-only founder. To approve or reject,
+            sign in with the approver founder ID.
           </div>
         </div>
       )}

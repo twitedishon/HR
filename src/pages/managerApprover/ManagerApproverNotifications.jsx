@@ -111,9 +111,7 @@ export default function ManagerNotifications() {
           </p>
           <p className="text-sm text-slate-600">View important updates for your team.</p>
         </div>
-        <span className="ml-auto inline-flex items-center gap-1 text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
-          <Eye size={14} /> View only
-        </span>
+
       </div>
 
       <div className="space-y-3">
@@ -132,31 +130,62 @@ export default function ManagerNotifications() {
         ) : (
           alerts.map((a) => {
             const isClickable = a.source === "LeaveManagement";
+
+            // Try to parse the detail for cleaner display
+            // Format 1: "X submitted a Y request for Z."
+            // Format 2: "HR sent a Y request for X (Z) for your approval."
+            let primaryText = a.detail;
+            let secondaryText = "";
+            let tertiaryText = "";
+
+            const submittedMatch = a.detail.match(/^(.+?) submitted a (.+?) request for (.+?)(\.|$)/i);
+            const hrMatch = a.detail.match(/^HR sent a (.+?) request for (.+?) \((.+?)\) for your approval/i);
+
+            if (submittedMatch) {
+              primaryText = submittedMatch[1]; // Name
+              secondaryText = submittedMatch[2]; // Type
+              tertiaryText = submittedMatch[3]; // Dates
+            } else if (hrMatch) {
+              primaryText = hrMatch[2]; // Name
+              secondaryText = hrMatch[1]; // Type
+              tertiaryText = hrMatch[3]; // Dates
+            }
+
             return (
               <div
                 key={a.id}
                 onClick={() => handleNotificationClick(a)}
-                className={`rounded-2xl border bg-white p-4 shadow-sm flex items-start gap-3 ${isClickable ? "cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 transition-colors" : ""
+                className={`rounded-2xl border bg-white p-4 shadow-sm flex items-start gap-3 ${isClickable ? "cursor-pointer hover:bg-slate-50 transition-colors" : ""
                   }`}
               >
-                <div className="h-10 w-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700">
+                <div className="h-10 w-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 shrink-0">
                   <Bell size={16} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold text-slate-900">{a.title}</p>
-                    <span className={`text-[11px] rounded-full border px-2.5 py-0.5 ${isClickable ? "text-indigo-600 border-indigo-200 bg-indigo-50" : "text-slate-500"
-                      }`}>
-                      {a.source}
-                    </span>
-                    {isClickable && (
-                      <span className="text-[10px] text-indigo-500 font-medium">
-                        (Click to view)
-                      </span>
-                    )}
-                  </div>
-                  {a.detail ? <p className="text-sm text-slate-600">{a.detail}</p> : null}
-                  <p className="text-xs text-slate-400 mt-1">{a.timeLabel}</p>
+                  {secondaryText ? (
+                    // Parsed View
+                    <div className="flex flex-col gap-0.5">
+                      <p className="font-bold text-slate-900 leading-tight">
+                        {primaryText}
+                      </p>
+                      <p className="text-xs text-slate-600 font-medium">
+                        {secondaryText}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {tertiaryText}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-1 font-medium">
+                        {a.timeLabel}
+                      </p>
+                    </div>
+                  ) : (
+                    // Default View (fallback)
+                    <>
+                      <p className="text-sm font-semibold text-slate-900 mb-1">{a.title}</p>
+                      <p className="text-xs text-slate-600 mb-1">{a.detail}</p>
+                      <p className="text-[10px] text-slate-400">{a.timeLabel}</p>
+                    </>
+                  )}
                 </div>
               </div>
             );
