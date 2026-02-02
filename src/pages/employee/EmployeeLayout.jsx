@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { supabase } from "../../lib/supabaseClient";
 import {
   Bell,
   CalendarDays,
@@ -48,12 +49,60 @@ const tabs = [
 export default function EmployeeLayout() {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [notifCount, setNotifCount] = useState(0);
 
   useEffect(() => {
     if (localStorage.getItem("hrmss.signin.completed.employee") !== "true") {
       navigate("/sign-in", { state: { role: "employee" } });
     }
   }, [navigate]);
+
+  useEffect(() => {
+    const fetchCount = async () => {
+      let authUserId = null;
+      let employeeId = null;
+
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData?.user?.id) authUserId = userData.user.id;
+
+      try {
+        const authSession = localStorage.getItem("HRMSS_AUTH_SESSION");
+        if (authSession) {
+          const parsed = JSON.parse(authSession);
+          employeeId = parsed?.employee_id || parsed?.identifier || parsed?.empId;
+        }
+      } catch { }
+
+      if (!employeeId) {
+        try {
+          const legacy = localStorage.getItem("hrmss.employee.signin");
+          if (legacy) {
+            const parsed = JSON.parse(legacy);
+            employeeId = parsed?.employee_id || parsed?.identifier || parsed?.empId;
+          }
+        } catch { }
+      }
+
+      const userIds = [authUserId, employeeId].filter(Boolean);
+      if (userIds.length === 0) return;
+
+      const { count } = await supabase
+        .from("employee_notifications")
+        .select("*", { count: "exact", head: true })
+        .in("user_id", userIds)
+        .eq("unread", true);
+
+      setNotifCount(count || 0);
+    };
+
+    fetchCount();
+
+    const channel = supabase.channel('employee_layout_count')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_notifications' }, fetchCount)
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, []);
 
   const handleLogout = () => {
     try {
@@ -125,7 +174,7 @@ export default function EmployeeLayout() {
               <NavLink
                 to="notifications"
                 className={({ isActive }) =>
-                  `inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${isActive
+                  `relative inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${isActive
                     ? "bg-gray-900 text-white shadow"
                     : "text-gray-700 hover:bg-gray-100"
                   }`
@@ -133,6 +182,11 @@ export default function EmployeeLayout() {
               >
                 <Bell size={16} />
                 Notifications
+                {notifCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] text-white font-bold">
+                    {notifCount > 99 ? "99+" : notifCount}
+                  </span>
+                )}
               </NavLink>
               <NavLink
                 to="profile"

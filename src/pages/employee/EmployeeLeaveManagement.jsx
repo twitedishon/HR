@@ -21,10 +21,13 @@ const EXCLUDE_APPROVER_IDS = new Set([]);
 const leaveTypes = [
   "Casual Leave",
   "Sick Leave",
-  "Annual Leave",
-  "Work From Home",
-  "Emergency Leave",
-  "Other",
+  "Maternity/Paternity",
+  "Paid Leave",
+  "Work from home",
+  "Holidays",
+  "Permissions",
+  "Special Leave",
+  "Bereavement Leave",
 ];
 const probationLeaveTypes = ["Emergency Leave"];
 const leaveModes = ["Full Day", "Half Day", "Permission"];

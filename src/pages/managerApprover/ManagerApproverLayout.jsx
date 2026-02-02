@@ -11,8 +11,20 @@ import {
   Shield,
 } from "lucide-react";
 import { getManagerSession } from "./managerApproverData";
+import { supabase } from "../../lib/supabaseClient";
 
 const DOCS_AUTH_KEY = "HRMSS_DOCS_AUTH";
+
+const ALLOWED_SOURCES = [
+  "Employees",
+  "Attendance",
+  "LeaveManagement",
+  "Payroll",
+  "Documents",
+  "My Profile",
+  "Birthday",
+];
+const AUDIENCE = ["approver", "manager", "all"];
 
 const navItems = [
   { to: "/manager-approver-dashboard", end: true, label: "Dashboard", icon: Home },
@@ -26,10 +38,9 @@ const NavItem = ({ to, icon: Icon, label, end, isCollapsed }) => (
     end={end}
     className={({ isActive }) =>
 
-      `flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-        isActive
-          ? "bg-indigo-700 text-white shadow-lg shadow-indigo-200"
-          : "text-slate-200 hover:bg-white/10 hover:text-white"
+      `flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive
+        ? "bg-indigo-700 text-white shadow-lg shadow-indigo-200"
+        : "text-slate-200 hover:bg-white/10 hover:text-white"
       }`
     }
   >
@@ -44,8 +55,36 @@ export default function ManagerLayout() {
   const location = useLocation();
   const [session, setSession] = useState(getManagerSession());
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [notifCount, setNotifCount] = useState(0);
 
   const access = session.access || session.role;
+
+  useEffect(() => {
+    const fetchCount = async () => {
+      const { count } = await supabase
+        .from("hrmss_notifications")
+        .select("*", { count: "exact", head: true })
+        .in("source", ALLOWED_SOURCES)
+        .in("audience", AUDIENCE)
+        .eq("unread", true);
+      setNotifCount(count || 0);
+    };
+
+    fetchCount();
+
+    const channel = supabase
+      .channel("manager_layout_notif_count")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "hrmss_notifications" },
+        () => fetchCount()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   useEffect(() => {
     // Just hydrate from stored manager session; avoid redirects that break navigation.
@@ -56,7 +95,7 @@ export default function ManagerLayout() {
   const handleLogout = () => {
     try {
       sessionStorage.removeItem(DOCS_AUTH_KEY);
-    } catch {}
+    } catch { }
     localStorage.removeItem(DOCS_AUTH_KEY);
     navigate("/login");
   };
@@ -65,9 +104,8 @@ export default function ManagerLayout() {
     <div className="min-h-screen bg-slate-50 flex">
       <aside
 
-        className={`bg-gradient-to-b from-slate-900 to-indigo-900 text-white sticky top-0 h-screen transition-all duration-300 ease-in-out ${
-          isSidebarOpen ? "w-[280px]" : "w-[72px]"
-        }`}
+        className={`bg-gradient-to-b from-slate-900 to-indigo-900 text-white sticky top-0 h-screen transition-all duration-300 ease-in-out ${isSidebarOpen ? "w-[280px]" : "w-[72px]"
+          }`}
       >
         <div className="h-full flex flex-col overflow-hidden">
           <div className={`p-5 border-b border-white/10 flex items-center gap-3 ${isSidebarOpen ? 'justify-between' : 'justify-center'}`}>
@@ -83,7 +121,7 @@ export default function ManagerLayout() {
               <div className="w-8 h-8 rounded-lg bg-white/20 text-white flex items-center justify-center font-black">M</div>
             )}
           </div>
-          
+
           {isSidebarOpen && (
             <div className="p-4 bg-white/5 border-b border-white/10">
               <div className="rounded-xl bg-white/10 p-3 text-sm space-y-1">
@@ -105,7 +143,7 @@ export default function ManagerLayout() {
               className={`w-full inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 text-white text-sm font-semibold hover:bg-white/20 transition-all ${isSidebarOpen ? 'px-4 py-3' : 'h-10'}`}
               title="Logout"
             >
-              <LogOut size={16} /> 
+              <LogOut size={16} />
               {isSidebarOpen && <span>Logout</span>}
             </button>
           </div>
@@ -127,20 +165,24 @@ export default function ManagerLayout() {
                 <Menu size={18} />
               </button>
 
-              
+
               <div className="flex items-center gap-2 ml-auto">
                 <NavLink
                   to="/manager-approver-dashboard/notifications"
                   className={({ isActive }) =>
-                    `inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                      isActive
-                        ? "bg-indigo-700 text-white shadow"
-                        : "text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
+                    `relative inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${isActive
+                      ? "bg-indigo-700 text-white shadow"
+                      : "text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
                     }`
                   }
                 >
                   <Bell size={16} />
                   Notifications
+                  {notifCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] text-white font-bold">
+                      {notifCount > 99 ? "99+" : notifCount}
+                    </span>
+                  )}
                 </NavLink>
 
               </div>

@@ -86,6 +86,18 @@ export default function EmployeeNotifications() {
     }
   };
 
+  const markRead = async (id) => {
+    if (!id) return;
+    const { error } = await supabase
+      .from(TABLE)
+      .update({ unread: false })
+      .eq("id", id);
+
+    if (!error) {
+      setRows((prev) => prev.map((n) => (n.id === id ? { ...n, unread: false } : n)));
+    }
+  };
+
   useEffect(() => {
     fetchNotifications();
   }, []);
@@ -157,15 +169,29 @@ export default function EmployeeNotifications() {
                       <Clock3 size={12} /> {n.created_at ? new Date(n.created_at).toLocaleString() : ""}
                     </div>
                   </div>
-                  {n.route ? (
-                    <a
-                      href={n.route}
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-800"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      View
-                    </a>
-                  ) : null}
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    {n.route ? (
+                      <a
+                        href={n.route}
+                        className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        View
+                      </a>
+                    ) : null}
+
+                    {n.unread && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          markRead(n.id);
+                        }}
+                        className="text-xs font-semibold text-slate-500 hover:text-slate-800"
+                      >
+                        Mark read
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );

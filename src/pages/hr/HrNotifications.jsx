@@ -435,11 +435,10 @@ export default function HrNotifications() {
 
       // ✅ Filter out dismissed notifications and apply user-specific read state
       const dismissedIds = getDismissedIds();
-      const readIds = getReadIds();
-
       const filteredMapped = mapped.filter(n => !dismissedIds.includes(n.id)).map(n => ({
         ...n,
-        unread: readIds.includes(n.id) ? false : n.unread,
+        // Using DB unread status directly
+        unread: n.unread,
       }));
 
       setItems(filteredMapped);
@@ -504,12 +503,19 @@ export default function HrNotifications() {
   const clearSelection = () => setSelected(new Set());
   const selectAllFiltered = () => setSelected(() => new Set(filtered.map((x) => x.id)));
 
-  // ✅ mark read (user-specific, stored in localStorage)
+  // ✅ mark read (DB update)
   const markRead = async (ids) => {
     if (!ids?.length) return;
 
-    // Store read state in localStorage for this HR user
-    addReadIds(ids);
+    const globalIds = ids.filter(id => String(id).startsWith('g-')).map(id => String(id).slice(2));
+    const personalIds = ids.filter(id => String(id).startsWith('p-')).map(id => String(id).slice(2));
+
+    if (globalIds.length) {
+      await supabase.from(TABLE).update({ unread: false }).in('id', globalIds);
+    }
+    if (personalIds.length) {
+      await supabase.from("employee_notifications").update({ unread: false }).in('id', personalIds);
+    }
 
     setItems((prev) => prev.map((x) => (ids.includes(x.id) ? { ...x, unread: false } : x)));
     setSelected((prev) => {

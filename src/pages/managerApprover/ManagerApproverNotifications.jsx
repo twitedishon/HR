@@ -35,7 +35,7 @@ export default function ManagerNotifications() {
 
     const { data, error } = await supabase
       .from(TABLE)
-      .select("id,title,detail,type,source,created_at")
+      .select("id,title,detail,type,source,created_at,unread")
       .in("source", ALLOWED_SOURCES)
       .in("audience", AUDIENCE)
       .order("created_at", { ascending: false });
@@ -52,6 +52,7 @@ export default function ManagerNotifications() {
         timeLabel: formatTimeLabel(n.created_at),
         source: n.source || "-",
         type: n.type || "info",
+        unread: n.unread,
       }));
       setAlerts(mapped);
     }
@@ -64,7 +65,21 @@ export default function ManagerNotifications() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleNotificationClick = (notification) => {
+  const handleNotificationClick = async (notification) => {
+    // Mark as read
+    if (notification.unread) {
+      const { error } = await supabase
+        .from(TABLE)
+        .update({ unread: false })
+        .eq("id", notification.id);
+
+      if (!error) {
+        setAlerts((prev) =>
+          prev.map((n) => (n.id === notification.id ? { ...n, unread: false } : n))
+        );
+      }
+    }
+
     // Navigate to Manager Leave page when clicking LeaveManagement notifications
     if (notification.source === "LeaveManagement") {
       navigate("/manager-approver-dashboard/approvals");
@@ -72,7 +87,7 @@ export default function ManagerNotifications() {
   };
 
   // Calculate notification count
-  const notificationCount = alerts.length;
+  const notificationCount = alerts.filter((a) => a.unread).length;
 
   return (
     <div className="space-y-4">
