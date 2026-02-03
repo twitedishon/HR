@@ -118,6 +118,7 @@ export default function App() {
           <Route path="profile" element={<ApproverEmployeeProfile />} />
           <Route path="profile/edit" element={<EmployeeSignIn />} />
           <Route path="career-guidance" element={<ApproverCareerGuidance />} />
+          <Route path="calendar" element={<LeaveCalendar />} />
         </Route>
 
         {/* ================= ADMIN HEAD ================= */}
@@ -145,12 +146,14 @@ export default function App() {
         {/* ================= MANAGER ================= */}
         <Route path="/manager-dashboard" element={<ManagerLayout />}>
           <Route index element={<ManagerDashboard />} />
+          <Route path="calendar" element={<LeaveCalendar />} />
         </Route>
 
         <Route path="/manager-approver-dashboard" element={<ManagerApproverLayout />}>
           <Route index element={<ManagerApproverDashboard />} />
           <Route path="approvals" element={<ManagerApproverApprovals />} />
           <Route path="notifications" element={<ManagerApproverNotifications />} />
+          <Route path="calendar" element={<LeaveCalendar />} />
         </Route>
 
         {/* ================= EMPLOYEE ================= */}
@@ -174,6 +177,7 @@ export default function App() {
           <Route path="support" element={<SupportPage />} />
           <Route path="career-guidance" element={<CareerGuidance />} />
           <Route path="people" element={<PeopleDirectory />} />
+          <Route path="calendar" element={<LeaveCalendar />} />
         </Route>
 
         {/* fallback */}

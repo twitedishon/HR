@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
-import { Home, LogOut, Menu, Shield } from "lucide-react";
+import { Home, LogOut, Menu, Shield, CalendarDays } from "lucide-react";
 import { getManagerSession } from "./managerData";
 
 const DOCS_AUTH_KEY = "HRMSS_DOCS_AUTH";
 
 const navItems = [
   { to: "/manager-dashboard", end: true, label: "Dashboard", icon: Home },
-
+  { to: "/manager-dashboard/calendar", label: "Calendar", icon: CalendarDays },
 ];
 
 const NavItem = ({ to, icon: Icon, label, end, isCollapsed }) => (

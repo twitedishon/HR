@@ -23,6 +23,9 @@ const Sidebar = () => {
         <NavLink to="/dashboard/leave" className={linkClasses}>
           LeaveManagement
         </NavLink>
+        <NavLink to="/dashboard/calendar" className={linkClasses}>
+          Calendar
+        </NavLink>
         <NavLink to="/dashboard/payslips" className={linkClasses}>
           Payslips
         </NavLink>

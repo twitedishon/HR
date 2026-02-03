@@ -9,6 +9,7 @@ import {
   LogOut,
   Menu,
   Shield,
+  CalendarDays
 } from "lucide-react";
 import { getManagerSession } from "./managerApproverData";
 import { supabase } from "../../lib/supabaseClient";
@@ -29,7 +30,7 @@ const AUDIENCE = ["approver", "manager", "all"];
 const navItems = [
   { to: "/manager-approver-dashboard", end: true, label: "Dashboard", icon: Home },
   { to: "/manager-approver-dashboard/approvals", label: "Leave Approvals", icon: CheckSquare },
-
+  { to: "/manager-approver-dashboard/calendar", label: "Calendar", icon: CalendarDays },
 ];
 
 const NavItem = ({ to, icon: Icon, label, end, isCollapsed }) => (

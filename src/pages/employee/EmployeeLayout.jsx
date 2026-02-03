@@ -39,6 +39,7 @@ const tabs = [
   { to: "dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "attendance", icon: ClipboardCheck, label: "Attendance" },
   { to: "leave", icon: CalendarDays, label: "Leave" },
+  { to: "calendar", icon: CalendarDays, label: "Calendar" },
   { to: "documents", icon: FileText, label: "Documents" },
   { to: "payslips", icon: FileText, label: "Payslips" },
   { to: "career-guidance", icon: Compass, label: "Career Ladder" },

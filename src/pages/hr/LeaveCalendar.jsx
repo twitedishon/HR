@@ -9,6 +9,30 @@ const LeaveCalendar = () => {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [showAddModal, setShowAddModal] = useState(false);
 
+    // Helper to get current user ID for storage key
+    const getUserId = () => {
+        try {
+            // Try common auth session
+            const authSession = localStorage.getItem("HRMSS_AUTH_SESSION");
+            if (authSession) {
+                const parsed = JSON.parse(authSession);
+                return parsed.employee_id || parsed.id || parsed.email || "guest";
+            }
+            // Fallback for different roles if needed
+            const empSession = localStorage.getItem("hrmss.employee.signin");
+            if (empSession) {
+                const parsed = JSON.parse(empSession);
+                return parsed.employee_id || parsed.id || "guest";
+            }
+        } catch (e) {
+            console.error("Error getting user ID", e);
+        }
+        return "guest";
+    };
+
+    const userId = getUserId();
+    const STORAGE_KEY = `HRMSS_CALENDAR_EVENTS_${userId}`;
+
     // State for events
     // In a real app, this would come from a backend/database
     const [events, setEvents] = useState(() => {
@@ -27,7 +51,7 @@ const LeaveCalendar = () => {
             { id: 'h12', date: new Date(2026, 11, 25), type: 'Holiday', category: 'Holiday', title: 'Christmas', color: 'holidayRed' },
         ];
 
-        const saved = localStorage.getItem('HRMSS_CALENDAR_EVENTS');
+        const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
             try {
                 const parsed = JSON.parse(saved).map(e => ({
@@ -46,8 +70,8 @@ const LeaveCalendar = () => {
     });
 
     useEffect(() => {
-        localStorage.setItem('HRMSS_CALENDAR_EVENTS', JSON.stringify(events));
-    }, [events]);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    }, [events, STORAGE_KEY]);
 
     const [newEvent, setNewEvent] = useState({
         title: '',
