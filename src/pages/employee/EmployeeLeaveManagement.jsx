@@ -411,7 +411,9 @@ const MultiApproverSelect = ({ items, valueIds, setValueIds, errorText }) => {
                     </div>
                     <div className="text-[11px] text-slate-500 truncate">
                       {a.id}
-                      {a.role ? ` • ${a.role}` : ""}
+                      {a.role
+                        ? ` • ${a.role === "manager" ? "Founder" : a.role}`
+                        : ""}
                       {a.access ? ` • ${a.access}` : ""}
                     </div>
                   </div>
@@ -709,7 +711,10 @@ function LeaveEditModal({
                 <option value="">Select Approver</option>
                 {approvers.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.name} {a.role ? `(${a.role})` : ""}
+                    {a.name}{" "}
+                    {a.role
+                      ? `(${a.role === "manager" ? "Founder" : a.role})`
+                      : ""}
                   </option>
                 ))}
               </select>
@@ -1429,7 +1434,9 @@ export default function EmployeeLeaveManagement() {
                       {r.requestToName || "-"}
                       {r.requestToRole ? (
                         <span className="ml-2 px-2 py-0.5 border rounded-full text-[11px] font-semibold">
-                          {r.requestToRole}
+                          {r.requestToRole === "manager"
+                            ? "Founder"
+                            : r.requestToRole}
                         </span>
                       ) : null}
                     </div>
