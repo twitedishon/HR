@@ -39,6 +39,7 @@ import Employees from "./pages/hr/Employees";
 import Payroll from "./pages/hr/Payroll";
 import PayslipManagement from "./pages/hr/PayslipManagement";
 import LeaveManagement from "./pages/hr/LeaveManagement";
+import LeaveCalendar from "./pages/hr/LeaveCalendar";
 import Attendance from "./pages/hr/Attendance";
 import HrDocuments from "./pages/hr/HrDocuments";
 import HrNotifications from "./pages/hr/HrNotifications";
@@ -89,6 +90,7 @@ export default function App() {
           <Route path="payroll" element={<Payroll basePath="/hr-dashboard" />} />
           <Route path="payslips" element={<PayslipManagement basePath="/hr-dashboard" />} />
           <Route path="leave" element={<LeaveManagement />} />
+          <Route path="calendar" element={<LeaveCalendar />} />
           <Route path="attendance" element={<Attendance />} />
           <Route path="documents" element={<HrDocuments />} />
           <Route path="notifications" element={<HrNotifications />} />

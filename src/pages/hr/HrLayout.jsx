@@ -118,6 +118,7 @@ export default function HrLayout() {
             <SideItem to="/hr-dashboard" end icon={LayoutDashboard} label="Dashboard" isCollapsed={!isSidebarOpen} />
             <SideItem to="/hr-dashboard/employees" icon={Users} label="Employees" isCollapsed={!isSidebarOpen} />
             <SideItem to="/hr-dashboard/leave" icon={CalendarDays} label="Leave Management" isCollapsed={!isSidebarOpen} />
+            <SideItem to="/hr-dashboard/calendar" icon={CalendarDays} label="Calendar" isCollapsed={!isSidebarOpen} />
             <SideItem to="/hr-dashboard/attendance" icon={ClipboardList} label="Attendance" isCollapsed={!isSidebarOpen} />
             <SideItem to="/hr-dashboard/payroll" icon={WalletCards} label="Payroll" isCollapsed={!isSidebarOpen} />
             <SideItem to="/hr-dashboard/payslips" icon={FileText} label="Payslips" isCollapsed={!isSidebarOpen} />
