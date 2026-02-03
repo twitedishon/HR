@@ -548,9 +548,7 @@ const ApproverEmployeeDashboard = () => {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <GhostButton onClick={fetchDashboardData}>Refresh</GhostButton>
-        </div>
+
       </div>
 
       <div className="grid grid-cols-1 gap-4">

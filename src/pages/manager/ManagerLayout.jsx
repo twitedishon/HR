@@ -17,10 +17,9 @@ const NavItem = ({ to, icon: Icon, label, end, isCollapsed }) => (
     end={end}
     className={({ isActive }) =>
 
-      `flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
-        isActive
-          ? "bg-indigo-700 text-white shadow-lg shadow-indigo-200"
-          : "text-slate-200 hover:bg-white/10 hover:text-white"
+      `flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive
+        ? "bg-indigo-700 text-white shadow-lg shadow-indigo-200"
+        : "text-slate-200 hover:bg-white/10 hover:text-white"
       }`
     }
   >
@@ -59,7 +58,7 @@ export default function ManagerLayout() {
   const handleLogout = () => {
     try {
       sessionStorage.removeItem(DOCS_AUTH_KEY);
-    } catch {}
+    } catch { }
     localStorage.removeItem(DOCS_AUTH_KEY);
     navigate("/login");
   };
@@ -68,25 +67,24 @@ export default function ManagerLayout() {
     <div className="min-h-screen bg-slate-50 flex">
       <aside
 
-        className={`bg-gradient-to-b from-slate-900 to-indigo-900 text-white sticky top-0 h-screen transition-all duration-300 ease-in-out ${
-          isSidebarOpen ? "w-[280px]" : "w-[72px]"
-        }`}
+        className={`bg-gradient-to-b from-slate-900 to-indigo-900 text-white sticky top-0 h-screen transition-all duration-300 ease-in-out ${isSidebarOpen ? "w-[280px]" : "w-[72px]"
+          }`}
       >
         <div className="h-full flex flex-col overflow-hidden">
           <div className={`p-5 border-b border-white/10 flex items-center gap-3 ${isSidebarOpen ? 'justify-between' : 'justify-center'}`}>
             {isSidebarOpen ? (
               <div>
-                <div className="text-xl font-extrabold leading-none">Manager</div>
+                <div className="text-xl font-extrabold leading-none">TWITE</div>
                 <div className="text-[10px] text-indigo-100/90 mt-1 flex items-center gap-2 uppercase font-bold tracking-wider">
                   <Shield size={12} />
-                  {approver ? "Approver Access" : "Viewer Access"}
+                  {approver ? "Approver Access" : "HRMS"}
                 </div>
               </div>
             ) : (
-              <div className="w-8 h-8 rounded-lg bg-white/20 text-white flex items-center justify-center font-black">M</div>
+              <div className="w-8 h-8 rounded-lg bg-white/20 text-white flex items-center justify-center font-black">T</div>
             )}
           </div>
-          
+
           {isSidebarOpen && (
             <div className="p-4 bg-white/5 border-b border-white/10">
               <div className="rounded-xl bg-white/10 p-3 text-sm space-y-1">
@@ -108,7 +106,7 @@ export default function ManagerLayout() {
               className={`w-full inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 text-white text-sm font-semibold hover:bg-white/20 transition-all ${isSidebarOpen ? 'px-4 py-3' : 'h-10'}`}
               title="Logout"
             >
-              <LogOut size={16} /> 
+              <LogOut size={16} />
               {isSidebarOpen && <span>Logout</span>}
             </button>
           </div>
@@ -118,7 +116,7 @@ export default function ManagerLayout() {
       <main className="flex-1">
         <header className="bg-white border-b sticky top-0 z-40">
           <div className="px-6 py-4 flex flex-col gap-1">
-            <div className="text-xs uppercase tracking-wide text-slate-500">Manager Portal</div>
+
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"

@@ -14,6 +14,7 @@ import {
   Clock3,
   MailOpen,
   RefreshCw,
+  Users,
 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient"; // ✅ adjust path if different
 
@@ -79,13 +80,15 @@ const tone = {
     border: "border-emerald-100",
     dot: "bg-emerald-500",
     bg: "bg-emerald-50/60",
+    cardBg: "bg-emerald-50/30",
   },
   warning: {
-    pill: "bg-amber-50 text-amber-800 ring-amber-200",
-    icon: "text-amber-600",
-    border: "border-amber-100",
-    dot: "bg-amber-500",
-    bg: "bg-amber-50/60",
+    pill: "bg-rose-50 text-rose-800 ring-rose-200",
+    icon: "text-rose-600",
+    border: "border-rose-100",
+    dot: "bg-rose-500",
+    bg: "bg-rose-50/60",
+    cardBg: "bg-rose-50/30",
   },
   info: {
     pill: "bg-blue-50 text-blue-700 ring-blue-200",
@@ -93,6 +96,7 @@ const tone = {
     border: "border-blue-100",
     dot: "bg-blue-500",
     bg: "bg-blue-50/60",
+    cardBg: "bg-blue-50/30",
   },
 };
 
@@ -102,19 +106,25 @@ const typeIcon = {
   info: Info,
 };
 
+const typeLabel = (key) => {
+  if (key === "success") return "APPROVED";
+  if (key === "warning") return "REJECTED";
+  return String(key).toUpperCase();
+};
+
 /* ===================== HELPERS ===================== */
 function cn(...a) {
   return a.filter(Boolean).join(" ");
 }
 
-function Chip({ active, children, onClick }) {
+function Chip({ active, children, onClick, activeClass }) {
   return (
     <button
       onClick={onClick}
       className={cn(
         "text-xs px-3 py-1.5 rounded-full border transition",
         active
-          ? "bg-slate-900 text-white border-slate-900"
+          ? activeClass || "bg-slate-900 text-white border-slate-900"
           : "bg-white text-slate-700 hover:bg-slate-50"
       )}
     >
@@ -135,29 +145,44 @@ function EmptyState() {
   );
 }
 
-function StatCard({ icon: Icon, label, value, active, onClick }) {
+function StatCard({ icon: Icon, label, value, active, onClick, colorTheme }) {
+  // Define themes
+  const themes = {
+    blue: "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100",
+    rose: "bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100",
+    emerald: "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100",
+    indigo: "bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100",
+  };
+  const themeClass = colorTheme ? themes[colorTheme] : null;
+
   return (
     <button
       onClick={onClick}
       className={cn(
         "w-full text-left rounded-3xl border p-4 shadow-sm transition",
-        active
-          ? "bg-white/15 border-white/25 ring-2 ring-white/20"
-          : "bg-white/10 border-white/15 hover:bg-white/15"
+        themeClass
+          ? themeClass
+          : active
+            ? "bg-white/15 border-white/25 ring-2 ring-white/20 text-white"
+            : "bg-white/10 border-white/15 hover:bg-white/15 text-white"
       )}
     >
       <div className="flex items-center gap-3">
         <div
           className={cn(
             "h-11 w-11 rounded-2xl grid place-items-center border",
-            active ? "bg-white/10 border-white/20" : "bg-white/10 border-white/15"
+            themeClass
+              ? "bg-white/60 border-black/5"
+              : active
+                ? "bg-white/10 border-white/20"
+                : "bg-white/10 border-white/15"
           )}
         >
-          <Icon size={18} className="text-white" />
+          <Icon size={18} className={themeClass ? "text-current" : "text-white"} />
         </div>
         <div className="min-w-0">
-          <p className="text-xs text-white/70">{label}</p>
-          <p className="text-lg font-bold leading-tight text-white">{value}</p>
+          <p className={cn("text-xs", themeClass ? "text-current opacity-80" : "text-white/70")}>{label}</p>
+          <p className={cn("text-lg font-bold leading-tight", themeClass ? "text-current" : "text-white")}>{value}</p>
         </div>
       </div>
     </button>
@@ -171,9 +196,10 @@ function NotificationRow({ n, selected, onToggleSelect, onMarkRead, onDelete, on
   return (
     <div
       className={cn(
-        "group rounded-3xl border bg-white p-4 shadow-sm transition",
+        "group rounded-3xl border p-4 shadow-sm transition",
         selected ? "ring-2 ring-slate-900/10" : "hover:shadow-md",
-        n.unread ? "border-slate-200" : "border-slate-100"
+        n.unread ? "border-slate-200" : "border-slate-100",
+        t.cardBg || "bg-white"
       )}
     >
       <div className="flex items-start gap-3">
@@ -197,7 +223,7 @@ function NotificationRow({ n, selected, onToggleSelect, onMarkRead, onDelete, on
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className={cn("text-[11px] font-semibold rounded-full px-3 py-1 ring-1", t.pill)}>
-                  {String(n.type || "info").toUpperCase()}
+                  {typeLabel(n.type)}
                 </span>
 
                 <span className="text-[11px] text-slate-500 rounded-full border px-2.5 py-1">
@@ -370,7 +396,15 @@ export default function AdminNotifications() {
         const typeOk = type === "All" ? true : n.type === type;
         const sourceOk = source === "All" ? true : n.source === source;
         const statusOk =
-          status === "All" ? true : status === "Unread" ? n.unread === true : n.unread === false;
+          status === "All"
+            ? true
+            : status === "Unread"
+              ? n.unread === true
+              : status === "Read"
+                ? n.unread === false
+                : status === "Team"
+                  ? n.type === "info"
+                  : true;
 
         const text = `${n.title || ""} ${n.detail || ""} ${n.source || ""} ${n.created_at || ""}`.toLowerCase();
         const qOk = !query ? true : text.includes(query);
@@ -379,9 +413,9 @@ export default function AdminNotifications() {
       });
   }, [items, q, type, source, status]);
 
-  // counts should reflect the currently filtered list, not a hardcoded total
+  // counts should reflect the FULL list, not the filtered list
   const counts = useMemo(() => {
-    const list = filtered;
+    const list = items;
     const total = list.length;
     const unread = list.filter((x) => x.unread).length;
     const read = list.filter((x) => !x.unread).length;
@@ -389,7 +423,7 @@ export default function AdminNotifications() {
     const warning = list.filter((x) => x.type === "warning").length;
     const info = list.filter((x) => x.type === "info").length;
     return { total, unread, read, success, warning, info };
-  }, [filtered]);
+  }, [items]);
 
   const selectedCount = selected.size;
 
@@ -448,7 +482,7 @@ export default function AdminNotifications() {
 
         <div className="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-wider text-white/85">Admin Console</p>
+
             <h1 className="text-2xl font-bold mt-1">Notifications</h1>
             <p className="text-sm text-white/85 mt-1">
               Shows only: LeaveManagement.
@@ -465,16 +499,18 @@ export default function AdminNotifications() {
           </button>
         </div>
 
-        <div className="relative mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
-          <StatCard icon={Bell} label="Total" value={counts.total} active={status === "All"} onClick={() => setStatus("All")} />
+        <div className="relative mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard icon={Bell} label="Total" value={counts.total} active={status === "All"} onClick={() => setStatus("All")} colorTheme="blue" />
           <StatCard
             icon={AlertTriangle}
             label="Unread"
             value={counts.unread}
             active={status === "Unread"}
             onClick={() => setStatus("Unread")}
+            colorTheme="rose"
           />
-          <StatCard icon={ShieldCheck} label="Read" value={counts.read} active={status === "Read"} onClick={() => setStatus("Read")} />
+          <StatCard icon={ShieldCheck} label="Read" value={counts.read} active={status === "Read"} onClick={() => setStatus("Read")} colorTheme="emerald" />
+          <StatCard icon={Users} label="Team" value={counts.info} active={status === "Team"} onClick={() => setStatus("Team")} colorTheme="indigo" />
         </div>
       </div>
 
@@ -500,13 +536,13 @@ export default function AdminNotifications() {
               <Chip active={type === "All"} onClick={() => setType("All")}>
                 All ({counts.total})
               </Chip>
-              <Chip active={type === "success"} onClick={() => setType("success")}>
-                Success ({counts.success})
+              <Chip active={type === "success"} onClick={() => setType("success")} activeClass="bg-emerald-600 text-white border-emerald-600">
+                Approved ({counts.success})
               </Chip>
-              <Chip active={type === "warning"} onClick={() => setType("warning")}>
-                Warning ({counts.warning})
+              <Chip active={type === "warning"} onClick={() => setType("warning")} activeClass="bg-rose-600 text-white border-rose-600">
+                Rejected ({counts.warning})
               </Chip>
-              <Chip active={type === "info"} onClick={() => setType("info")}>
+              <Chip active={type === "info"} onClick={() => setType("info")} activeClass="bg-blue-600 text-white border-blue-600">
                 Info ({counts.info})
               </Chip>
             </div>

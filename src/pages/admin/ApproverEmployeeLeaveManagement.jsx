@@ -603,7 +603,7 @@ const LeaveManagement = () => {
   const dataset = useMemo(() => {
     if (mode === "employee") {
       if (currentAdmin?.id) {
-        return requests.filter((r) => r.ownerRole === "employee");
+        return requests.filter((r) => r.ownerRole === "employee" && r.assignedToMe);
       }
       if (currentEmployee?.id) {
         return requests.filter(
@@ -1278,25 +1278,25 @@ const LeaveManagement = () => {
 
       {/* Summary (CLICKABLE) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <button onClick={() => openSummary("All")} className="text-left bg-white border rounded-xl p-3 hover:shadow-sm transition">
-          <div className="text-xs text-gray-500">Total</div>
-          <div className="text-xl font-semibold">{counts.total}</div>
-          <div className="text-[11px] text-gray-400 mt-1">Click to view list</div>
+        <button onClick={() => openSummary("All")} className="text-left bg-blue-50 border border-blue-100 rounded-xl p-3 hover:shadow-sm transition">
+          <div className="text-xs text-blue-600 font-medium">Total</div>
+          <div className="text-xl font-bold text-blue-700">{counts.total}</div>
+          <div className="text-[10px] text-blue-400 mt-1 font-medium">Click to view list</div>
         </button>
-        <button onClick={() => openSummary("Pending")} className="text-left bg-white border rounded-xl p-3 hover:shadow-sm transition">
-          <div className="text-xs text-gray-500">Pending</div>
-          <div className="text-xl font-semibold">{counts.pending}</div>
-          <div className="text-[11px] text-gray-400 mt-1">Click to view list</div>
+        <button onClick={() => openSummary("Pending")} className="text-left bg-orange-50 border border-orange-100 rounded-xl p-3 hover:shadow-sm transition">
+          <div className="text-xs text-orange-600 font-medium">Pending</div>
+          <div className="text-xl font-bold text-orange-700">{counts.pending}</div>
+          <div className="text-[10px] text-orange-400 mt-1 font-medium">Click to view list</div>
         </button>
-        <button onClick={() => openSummary("Approved")} className="text-left bg-white border rounded-xl p-3 hover:shadow-sm transition">
-          <div className="text-xs text-gray-500">Approved</div>
-          <div className="text-xl font-semibold">{counts.approved}</div>
-          <div className="text-[11px] text-gray-400 mt-1">Click to view list</div>
+        <button onClick={() => openSummary("Approved")} className="text-left bg-emerald-50 border border-emerald-100 rounded-xl p-3 hover:shadow-sm transition">
+          <div className="text-xs text-emerald-600 font-medium">Approved</div>
+          <div className="text-xl font-bold text-emerald-700">{counts.approved}</div>
+          <div className="text-[10px] text-emerald-400 mt-1 font-medium">Click to view list</div>
         </button>
-        <button onClick={() => openSummary("Rejected")} className="text-left bg-white border rounded-xl p-3 hover:shadow-sm transition">
-          <div className="text-xs text-gray-500">Rejected</div>
-          <div className="text-xl font-semibold">{counts.rejected}</div>
-          <div className="text-[11px] text-gray-400 mt-1">Click to view list</div>
+        <button onClick={() => openSummary("Rejected")} className="text-left bg-rose-50 border border-rose-100 rounded-xl p-3 hover:shadow-sm transition">
+          <div className="text-xs text-rose-600 font-medium">Rejected</div>
+          <div className="text-xl font-bold text-rose-700">{counts.rejected}</div>
+          <div className="text-[10px] text-rose-400 mt-1 font-medium">Click to view list</div>
         </button>
       </div>
 

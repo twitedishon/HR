@@ -497,7 +497,7 @@ export default function LeaveManagement() {
   }, [requests]);
 
   const managerLabel = useMemo(() => {
-    if (managers.length === 0) return "Manager";
+    if (managers.length === 0) return "Founder";
     return managers
       .map((m) => `${m.name}${m.access === "viewer" ? " (viewer)" : " (approver)"}`)
       .join(", ");
@@ -541,13 +541,13 @@ export default function LeaveManagement() {
 
     if (managers.length === 0) {
       return alert(
-        "Managers list empty. Add managers in hrmss_approvers table (role=manager)."
+        "Founders list empty. Add founders in hrmss_approvers table (role=manager)."
       );
     }
 
     const approverMgr = managers.find((m) => m.access === "approver");
     const viewerMgrs = managers.filter((m) => m.access === "viewer");
-    if (!approverMgr) return alert("No approver manager found. Set Arun as access='approver'.");
+    if (!approverMgr) return alert("No approver founder found. Set Arun as access='approver'.");
 
     const toDateForDB = isFullDay(applyMode) ? uiTo : applyFrom;
 
@@ -608,7 +608,7 @@ export default function LeaveManagement() {
     setShowApply(false);
 
     fetchRequests();
-    alert("Leave request sent to Managers!");
+    alert("Leave request sent to Founders!");
   };
 
   /* ===================== UI ===================== */
@@ -815,7 +815,7 @@ export default function LeaveManagement() {
 
                       <div className="text-xs text-gray-500 mt-2">
                         <span className="font-semibold text-gray-700">Request To:</span>{" "}
-                        <span className="font-semibold">{r.requestToRole || "manager"}</span>{" "}
+                        <span className="font-semibold">{r.requestToRole === "manager" ? "Founder" : (r.requestToRole || "Founder")}</span>{" "}
                         <span className="text-gray-500">• {r.requestToName || "-"}</span>
                       </div>
                     </td>
@@ -908,7 +908,7 @@ export default function LeaveManagement() {
                 <p className="text-[11px] uppercase tracking-[0.2em] text-white/80">
                   Apply Leave
                 </p>
-                <div className="mt-1 text-lg font-semibold">Request To: Manager</div>
+                <div className="mt-1 text-lg font-semibold">Request To: Founder</div>
                 <div className="text-xs text-white/80 mt-1">
                   Will be sent to approver + viewer
                 </div>
@@ -928,13 +928,13 @@ export default function LeaveManagement() {
             <div className="flex-1 overflow-y-auto p-5 space-y-4 text-sm">
               <div className="rounded-xl border border-slate-200 p-3 bg-slate-50">
                 <div className="text-xs text-slate-500">Request To</div>
-                <div className="font-semibold text-slate-900">Manager</div>
+                <div className="font-semibold text-slate-900">Founder</div>
                 <div className="text-xs text-slate-700 mt-1">
-                  {managers.length ? managerLabel : "No managers found"}
+                  {managers.length ? managerLabel : "No founders found"}
                 </div>
                 {mgrError ? (
                   <div className="text-xs text-rose-600 mt-2">
-                    Managers fetch error: {mgrError}
+                    Founders fetch error: {mgrError}
                   </div>
                 ) : null}
               </div>
@@ -1164,7 +1164,7 @@ export default function LeaveManagement() {
               <div className="rounded-xl bg-white border border-slate-100 p-3">
                 <p className="text-[11px] text-slate-500">Request To</p>
                 <p className="mt-1 font-semibold text-slate-900">
-                  {viewing.requestToRole || "manager"} • {viewing.requestToName || "-"}
+                  {viewing.requestToRole === "manager" ? "Founder" : (viewing.requestToRole || "Founder")} • {viewing.requestToName || "-"}
                 </p>
               </div>
 
