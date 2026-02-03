@@ -22,6 +22,7 @@ import { formatDDMMYYYY } from "../../lib/dateUtils";
 const PAYROLL_TABLE = "hrmss_payroll";
 const EMP_TABLE = "hrmss_employees";
 const PAYSLIP_RECORDS = "hrmss_payslip_records";
+const PROFILE_TABLE = "hrmss_employee_profiles";
 
 const COMPANY = {
   name: import.meta.env.VITE_COMPANY_NAME || "Company",
@@ -146,6 +147,12 @@ function PayslipPreviewModal({ open, onClose, slip }) {
   const deductionsTotal = deductions.reduce((s, [, v]) => s + Number(v || 0), 0);
   const netPay = Math.max(0, Number(slip.net || earningsTotal - deductionsTotal));
   const monthYear = formatMonthYear(slip.month);
+
+  const bankName = slip.bankName || "-";
+  const accountNum = slip.accountNumber ? `XXXX XXXX ${String(slip.accountNumber).slice(-4)}` : "-";
+  const ifsc = slip.ifsc || "-";
+  const branch = slip.branch || "-";
+  const accHolder = slip.accHolder || "-";
 
   return (
     <div className="fixed inset-0 z-[60] bg-black/50 p-4 sm:p-8 overflow-y-auto">
@@ -327,16 +334,24 @@ function PayslipPreviewModal({ open, onClose, slip }) {
 
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
                 <div>
+                  <p className="text-[10px] font-bold text-slate-500">Account Holder</p>
+                  <p className="text-sm font-extrabold text-slate-900">{accHolder}</p>
+                </div>
+                <div>
                   <p className="text-[10px] font-bold text-slate-500">Bank Name</p>
-                  <p className="text-sm font-extrabold text-slate-900">{slip.bankName || "-"}</p>
+                  <p className="text-sm font-extrabold text-slate-900">{bankName}</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-slate-500">Account Number</p>
-                  <p className="text-sm font-extrabold text-slate-900">{slip.accountMasked || "-"}</p>
+                  <p className="text-sm font-extrabold text-slate-900">{accountNum}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-slate-500">Payment Mode</p>
-                  <p className="text-sm font-extrabold text-slate-900">{slip.paymentMode || "Bank Transfer"}</p>
+                  <p className="text-[10px] font-bold text-slate-500">IFSC Code</p>
+                  <p className="text-sm font-extrabold text-slate-900">{ifsc}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500">Branch</p>
+                  <p className="text-sm font-extrabold text-slate-900">{branch}</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-slate-500">Paid On</p>
@@ -375,14 +390,22 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
       setLoading(true);
       setErrMsg("");
 
-      const [empRes, payrollRes, recordRes] = await Promise.all([
+      const [empRes, payrollRes, recordRes, profileRes] = await Promise.all([
         supabase.from(EMP_TABLE).select("employee_id, full_name, department, role, join_date"),
         supabase
           .from(PAYROLL_TABLE)
           .select("id, employee_id, month, basic_salary, hra, allowances, conveyance_allowance, medical_allowance, special_allowance, pf_employee, pf_employer, esi_employee, esi_employer, professional_tax, deductions, net_salary, created_at")
           .order("created_at", { ascending: false }),
         supabase.from(PAYSLIP_RECORDS).select("month, published, note, created_at"),
+        supabase.from(PROFILE_TABLE).select("employee_id, bank_name, account_number, branch, ifsc_code, account_holder_name"),
       ]);
+
+      const profileMap = new Map();
+      if (!profileRes.error) {
+        profileRes.data.forEach(p => {
+          profileMap.set(p.employee_id, p);
+        });
+      }
 
       if (empRes.error) throw new Error(empRes.error.message);
       if (payrollRes.error) throw new Error(payrollRes.error.message);
@@ -406,6 +429,7 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
 
       const normalizedRows = (payrollRes.data || []).map((p) => {
         const emp = empMap.get(p.employee_id) || {};
+        const profile = profileMap.get(p.employee_id) || {};
         const month = String(p.month || "").trim() || "-";
         const basic = Number(p.basic_salary || 0);
         const hra = Number(p.hra || 0);
@@ -436,6 +460,11 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
           net,
           sent: publishedByMonth.get(month) || false,
           createdAt: p.created_at || null,
+          bankName: profile.bank_name || "",
+          accountNumber: profile.account_number || "",
+          branch: profile.branch || "",
+          ifsc: profile.ifsc_code || "",
+          accHolder: profile.account_holder_name || "",
         };
       });
 

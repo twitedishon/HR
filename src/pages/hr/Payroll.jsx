@@ -25,12 +25,13 @@ import {
   Save,
 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
+import { formatDDMMYYYY } from "../../lib/dateUtils";
 
 /* ---------------- CONFIG ---------------- */
 const EMP_TABLE = "hrmss_employees";
 const PAYROLL_TABLE = "hrmss_payroll";
 const BATCH_TABLE = "hrmss_payslip_records";
-const PROFILE_TABLE = "hrmss_profiles"; // optional (bank details)
+const PROFILE_TABLE = "hrmss_employee_profiles"; // updated from hrmss_profiles
 const ATT_TABLE = "employee_attendance"; // optional
 const LEAVE_TABLE = "hrmss_leave_requests"; // optional (if exists)
 
@@ -387,7 +388,7 @@ export default function PayrollPage() {
 
     const empRes = await supabase
       .from(EMP_TABLE)
-      .select("employee_id, full_name, role, department, status")
+      .select("employee_id, full_name, role, department, status, join_date")
       .order("employee_id", { ascending: true });
 
     if (empRes.error) {
@@ -404,6 +405,7 @@ export default function PayrollPage() {
         name: String(e.full_name || ""),
         role: String(e.role || "Employee"),
         department: String(e.department || "-"),
+        joinDate: e.join_date || "-",
       }));
 
     const payRes = await supabase
@@ -452,6 +454,7 @@ export default function PayrollPage() {
         name: e.name,
         role: e.role,
         department: e.department,
+        joinDate: e.joinDate,
 
         payrollId: p?.id || null,
         basic,
@@ -667,12 +670,12 @@ export default function PayrollPage() {
     const [profRes, empRes] = await Promise.all([
       supabase
         .from(PROFILE_TABLE)
-        .select("employee_id, bank_name, account_number, ifsc_code, branch")
+        .select("employee_id, bank_name, account_number, ifsc_code, branch, account_holder_name")
         .eq("employee_id", empId)
         .maybeSingle(),
       supabase
         .from(EMP_TABLE)
-        .select("employee_id, bank_name, account_number, ifsc_code, branch")
+        .select("employee_id, bank_name, account_number, ifsc_code, branch, account_holder_name")
         .eq("employee_id", empId)
         .maybeSingle(),
     ]);
@@ -1388,7 +1391,7 @@ export default function PayrollPage() {
       const empId = psRow.empId || "-";
       const designation = psRow.role || "-";
       const department = psRow.department || "-";
-      const joinDate = "-";
+      const joinDate = psRow.joinDate ? formatDDMMYYYY(psRow.joinDate) : "-";
       const gross =
         toNum(payslipBreakup.basic) +
         toNum(payslipBreakup.hra) +
@@ -1537,9 +1540,11 @@ export default function PayrollPage() {
 
           <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
             <p className="text-xs font-extrabold text-slate-900 uppercase">Payment Details</p>
+            <Detail label="Account Holder" value={bankInfo?.account_holder_name || "-"} />
             <Detail label="Bank Name" value={bankName} />
             <Detail label="Account Number" value={maskAccount(accountNumber)} />
-            <Detail label="Payment Mode" value="Bank Transfer" />
+            <Detail label="IFSC Code" value={bankInfo?.ifsc_code || "-"} />
+            <Detail label="Branch" value={bankInfo?.branch || "-"} />
             <Detail label="Paid On" value={formatPeriodDisplay(periodKey)} />
           </div>
 
@@ -1730,6 +1735,32 @@ export default function PayrollPage() {
           />
         </div>
 
+        {/* Payroll Actions ONLY in All tab */}
+        {tab === "all" && (
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex items-center gap-2">
+              <Settings size={16} className="text-slate-600" />
+              <p className="text-sm font-bold text-slate-900">Payroll Actions</p>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <ActionTile
+                tone="navy"
+                icon={BadgeIndianRupee}
+                title="Create / Edit Payroll"
+                onClick={() => openActionDetails("create")}
+              />
+              <ActionTile
+                tone="white"
+                icon={FileText}
+                title="Generate Payslip"
+                onClick={() => openActionDetails("payslip")}
+              />
+            </div>
+
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="flex flex-wrap gap-2">
           <TabButton active={tab === "all"} icon={LayoutGrid} onClick={() => { setTab("all"); setStatusFilter("All"); }}>
@@ -1746,6 +1777,8 @@ export default function PayrollPage() {
         {/* Employee Salary List */}
         {(tab === "all" || tab === "approved" || tab === "pending") && (
           <>
+
+
             <div className="rounded-xl border border-slate-200 bg-white">
               <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -1874,31 +1907,7 @@ export default function PayrollPage() {
               <div className="p-4" />
             </div>
 
-            {/* Payroll Actions ONLY in All tab */}
-            {tab === "all" && (
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center gap-2">
-                  <Settings size={16} className="text-slate-600" />
-                  <p className="text-sm font-bold text-slate-900">Payroll Actions</p>
-                </div>
 
-                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <ActionTile
-                    tone="navy"
-                    icon={BadgeIndianRupee}
-                    title="Create / Edit Payroll"
-                    onClick={() => openActionDetails("create")}
-                  />
-                  <ActionTile
-                    tone="white"
-                    icon={FileText}
-                    title="Generate Payslip"
-                    onClick={() => openActionDetails("payslip")}
-                  />
-                </div>
-
-              </div>
-            )}
           </>
         )}
 
