@@ -249,7 +249,7 @@ function NotificationRow({ n, selected, onToggleSelect, onMarkRead, onDelete, on
                 <span className="mx-1 text-slate-300">•</span>
                 <span className="inline-flex items-center gap-1">
                   <Clock3 size={12} />
-                  {n.timeLabel || n.created_at}
+                  {n.created_at ? new Date(n.created_at).toLocaleDateString("en-GB") : ""}
                 </span>
               </div>
             </div>
@@ -370,7 +370,10 @@ export default function AdminNotifications() {
         .map(n => ({
           ...n,
           // Strip [ADMIN-SELF] marker from detail for display
-          detail: String(n.detail || "").replace(/\[ADMIN-SELF\]\s*/gi, ""),
+          // Strip [ADMIN-SELF] marker and format dates
+          detail: String(n.detail || "")
+            .replace(/\[ADMIN-SELF\]\s*/gi, "")
+            .replace(/(\d{4})-(\d{2})-(\d{2})/g, "$3/$2/$1"),
           // Override unread status with user-specific read state
           unread: readIds.includes(n.id) ? false : n.unread,
         }));
@@ -469,6 +472,7 @@ export default function AdminNotifications() {
   };
 
   const goToSource = (n) => {
+    markRead([n.id]);
     const route = n.route || SOURCE_ROUTE[n.source] || "/dashboard";
     navigate(route, { state: { fromNotification: n, notifId: n.id } });
   };

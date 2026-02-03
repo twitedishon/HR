@@ -38,7 +38,7 @@ const SideItem = ({ to, icon: Icon, label, end, isCollapsed }) => (
 const tabs = [
   { to: "dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "attendance", icon: ClipboardCheck, label: "Attendance" },
-  { to: "leave", icon: CalendarDays, label: "Leave" },
+  { to: "leave", icon: CalendarDays, label: "Leave Management" },
   { to: "calendar", icon: CalendarDays, label: "Calendar" },
   { to: "documents", icon: FileText, label: "Documents" },
   { to: "payslips", icon: FileText, label: "Payslips" },

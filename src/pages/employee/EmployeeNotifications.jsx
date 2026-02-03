@@ -6,7 +6,10 @@ const TABLE = "employee_notifications";
 
 const tone = {
   success: "bg-emerald-50 text-emerald-800 border-emerald-100",
+  approve: "bg-emerald-50 text-emerald-800 border-emerald-100",
   warning: "bg-amber-50 text-amber-800 border-amber-100",
+  error: "bg-rose-50 text-rose-800 border-rose-100",
+  reject: "bg-rose-50 text-rose-800 border-rose-100",
   info: "bg-blue-50 text-blue-800 border-blue-100",
 };
 
@@ -149,22 +152,27 @@ export default function EmployeeNotifications() {
           <EmptyState />
         ) : (
           rows.map((n) => {
-            const toneCls = tone[n.type] || tone.info;
+            let typeLabel = n.type || "info";
+            if (typeLabel === "success") typeLabel = "approve";
+            if (typeLabel === "error") typeLabel = "reject";
+
+            const toneCls = tone[typeLabel] || tone[n.type] || tone.info;
+
             return (
               <div
                 key={n.id}
-                className={`rounded-2xl border p-4 bg-white shadow-sm ${n.unread ? "ring-1 ring-blue-100" : ""}`}
+                className={`rounded-2xl border p-4 shadow-sm ${toneCls} ${n.unread ? "ring-1 ring-blue-100" : ""}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border ${toneCls}`}>
-                        {String(n.type || "info").toUpperCase()}
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border bg-white/60 backdrop-blur-sm shadow-sm`}>
+                        {String(typeLabel).toUpperCase()}
                       </span>
-                      {n.category ? <span className="text-slate-400">· {n.category}</span> : null}
+                      {n.category ? <span className="text-slate-500">· {n.category}</span> : null}
                     </div>
                     <p className="mt-2 text-sm font-bold text-slate-900">{n.title || "Notification"}</p>
-                    {n.message ? <p className="text-sm text-slate-600 mt-1">{n.message}</p> : null}
+                    {n.message ? <p className="text-sm text-slate-700 mt-1">{n.message}</p> : null}
                     <div className="mt-2 text-[11px] text-slate-500 inline-flex items-center gap-1">
                       <Clock3 size={12} /> {n.created_at ? new Date(n.created_at).toLocaleString() : ""}
                     </div>
