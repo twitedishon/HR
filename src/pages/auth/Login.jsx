@@ -67,7 +67,7 @@ export default function Login() {
   const empPassRef = useRef(null);
 
   const roleTitle = useMemo(() => {
-    if (role === "manager") return "Manager Login";
+    if (role === "manager") return "Founder Login";
     if (role === "employee") return "Employee Login";
     if (role === "hr") return "HR Login";
     return "Login";
@@ -222,7 +222,7 @@ export default function Login() {
       p_password,
     });
 
-    if (error) throw new Error(error.message || "Manager login failed");
+    if (error) throw new Error(error.message || "Founder login failed");
 
 
     // 2. If valid data, return it
@@ -457,7 +457,7 @@ export default function Login() {
             name:
               managerSessionFromVerify.full_name ||
               managerSessionFromVerify.name ||
-              "Manager",
+              "Founder",
             email: managerSessionFromVerify.email || managerEmail,
             role: "manager",
             access,
@@ -588,7 +588,7 @@ export default function Login() {
 
         const managerSession = {
           id: m.manager_code || m.id || "MGR",
-          name: m.full_name || "Manager",
+          name: m.full_name || "Founder",
           email: m.email,
 
           role: "manager",
@@ -742,8 +742,8 @@ export default function Login() {
         type="button"
         onClick={() => resetFields(value)}
         className={`text-sm font-semibold pb-2 transition ${active
-            ? "text-purple-700 border-b-2 border-purple-700"
-            : "text-gray-500 hover:text-gray-700"
+          ? "text-purple-700 border-b-2 border-purple-700"
+          : "text-gray-500 hover:text-gray-700"
           }`}
       >
         {label}
@@ -765,7 +765,7 @@ export default function Login() {
               <div className="mt-2 h-1 w-10 rounded bg-purple-700" />
 
               <div className="mt-6 flex items-center gap-6 flex-wrap">
-                <RoleTab value="manager" label="Manager" />
+                <RoleTab value="manager" label="Founder" />
                 <RoleTab value="hr" label="HR" />
                 <RoleTab value="employee" label="Employee" />
               </div>
@@ -889,8 +889,8 @@ export default function Login() {
                   type="submit"
                   disabled={loading}
                   className={`w-full py-3 rounded-md text-white font-semibold transition shadow-md ${loading
-                      ? "bg-purple-400 cursor-not-allowed"
-                      : "bg-purple-700 hover:bg-purple-800"
+                    ? "bg-purple-400 cursor-not-allowed"
+                    : "bg-purple-700 hover:bg-purple-800"
                     }`}
                 >
                   {loading ? "Logging in..." : "Login"}

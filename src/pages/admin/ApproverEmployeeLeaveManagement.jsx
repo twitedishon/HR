@@ -321,8 +321,8 @@ const LeaveManagement = () => {
 
   // Request To (HR/Manager)
 
-  const APPROVER_OPTIONS = ["Manager"];
-  const [requestedTo, setRequestedTo] = useState(["Manager"]);
+  const APPROVER_OPTIONS = ["Founder"];
+  const [requestedTo, setRequestedTo] = useState(["Founder"]);
 
   const [halfSession, setHalfSession] = useState("First Half");
 
@@ -347,7 +347,7 @@ const LeaveManagement = () => {
     setTimeTo("");
     setHours("");
     setReason("");
-    setRequestedTo(["HR", "Manager"]);
+    setRequestedTo(["HR", "Founder"]);
     setHalfSession("First Half");
   };
 
@@ -793,7 +793,7 @@ const LeaveManagement = () => {
       .filter(Boolean);
 
     let managerSendError = "";
-    if (requestedTargets.includes("manager")) {
+    if (requestedTargets.includes("founder")) {
       try {
 
         const managers = await fetchApproversByRole("manager");
@@ -1055,7 +1055,7 @@ const LeaveManagement = () => {
             <div className="px-5 py-4 max-h-[70vh] overflow-y-auto">
               <div className="grid grid-cols-1 gap-3">
                 <div className="border border-gray-200 rounded-xl p-3">
-                  <div className="text-xs text-gray-500 mb-2">Request To (Manager only)</div>
+                  <div className="text-xs text-gray-500 mb-2">Request To (Founder only)</div>
                   <div className="flex flex-wrap gap-2">
                     {APPROVER_OPTIONS.map((opt) => {
                       const active = requestedTo.includes(opt);
@@ -1079,7 +1079,7 @@ const LeaveManagement = () => {
                     <span className="font-semibold">
                       {requestedTo.length ? requestedTo.join(", ") : "None"}
                     </span>{" "}
-                    (manager only)
+                    (founder only)
                   </div>
                 </div>
 
@@ -1379,12 +1379,12 @@ const LeaveManagement = () => {
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {r.recipients?.map((rt, idx) => (
                                   <span key={idx} className="bg-gray-100 border px-1.5 py-0.5 rounded text-[10px] font-bold text-gray-700">
-                                    {rt.role?.toUpperCase() || "OWNER"}: {rt.name || "-"}
+                                    {(rt.role === "manager" ? "FOUNDER" : rt.role?.toUpperCase()) || "OWNER"}: {rt.name || "-"}
                                   </span>
                                 ))}
                                 {!r.recipients?.length && (
                                   <span className="text-gray-400 italic">
-                                    {r.requestToRole || "manager"} • {r.requestToName || "-"}
+                                    {r.requestToRole === "manager" ? "Founder" : (r.requestToRole || "Founder")} • {r.requestToName || "-"}
                                   </span>
                                 )}
                               </div>
@@ -1583,7 +1583,7 @@ const LeaveManagement = () => {
                   Leave request detail
                 </p>
                 <div className="flex items-center gap-3">
-                  <span className="text-xl font-bold">#{String(viewing.id || "REQ").slice(0, 8)}</span>
+
                   <span className={pill(viewing.status)}>{viewing.status}</span>
                 </div>
               </div>
@@ -1641,7 +1641,7 @@ const LeaveManagement = () => {
                     {viewing.recipients && viewing.recipients.length > 0 ? (
                       viewing.recipients.map((rec, i) => (
                         <span key={i} className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full uppercase truncate max-w-[80px]">
-                          {rec.role}
+                          {rec.role === "manager" ? "Founder" : rec.role}
                         </span>
                       ))
                     ) : (
@@ -1691,12 +1691,7 @@ const LeaveManagement = () => {
               </div>
 
               {/* Status synchronization info for admin */}
-              {mode === "employee" && currentAdmin?.id && (
-                <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 text-[11px] text-amber-700 flex items-start gap-2 italic">
-                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                  <span>Admin View: You are viewing an employee's request. Decisions are made by HR/Managers.</span>
-                </div>
-              )}
+
             </div>
 
             {/* Sticky Actions */}

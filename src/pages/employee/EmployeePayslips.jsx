@@ -102,8 +102,8 @@ const MonthCard = ({ label, selected, onClick, paidOn }) => (
   <button
     onClick={onClick}
     className={`w-full text-left rounded-2xl border px-4 py-3 shadow-sm transition ${selected
-        ? "border-indigo-300 bg-indigo-50"
-        : "border-slate-200 bg-white hover:bg-slate-50"
+      ? "border-indigo-300 bg-indigo-50"
+      : "border-slate-200 bg-white hover:bg-slate-50"
       }`}
   >
     <div className="flex items-center justify-between">
@@ -156,12 +156,19 @@ export default function EmployeePayslips() {
           throw new Error("Database not configured.");
         }
 
-        // 1. Fetch Employee Details
-        const { data: emp, error: empErr } = await supabase
-          .from("hrmss_employees")
-          .select("*")
-          .eq("employee_id", employeeId)
-          .maybeSingle();
+        // 1. Fetch Employee Details + Profile Bank Details
+        const [{ data: emp, error: empErr }, { data: profile, error: profErr }] = await Promise.all([
+          supabase
+            .from("hrmss_employees")
+            .select("*")
+            .eq("employee_id", employeeId)
+            .maybeSingle(),
+          supabase
+            .from("hrmss_employee_profiles")
+            .select("bank_name, account_number, ifsc_code, branch, account_holder_name")
+            .eq("employee_id", employeeId)
+            .maybeSingle()
+        ]);
 
         if (empErr) throw empErr;
 
@@ -225,8 +232,11 @@ export default function EmployeePayslips() {
               lop: p.lop_days || "-"
             },
             bank: {
-              name: emp?.bank_name || "-",
-              account: maskAccount(emp?.account_number || ""),
+              holder: profile?.account_holder_name || emp?.full_name || "-",
+              name: profile?.bank_name || emp?.bank_name || "-",
+              account: maskAccount(profile?.account_number || emp?.account_number || ""),
+              ifsc: profile?.ifsc_code || "-",
+              branch: profile?.branch || "-",
               mode: p.payment_mode || "Bank Transfer",
               paidOn: monthKey,
             },
@@ -548,7 +558,15 @@ export default function EmployeePayslips() {
                   </p>
                 </div>
 
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500">
+                      Account Holder
+                    </p>
+                    <p className="text-sm font-extrabold text-slate-900">
+                      {data?.bank?.holder || "-"}
+                    </p>
+                  </div>
                   <div>
                     <p className="text-[10px] font-bold text-slate-500">
                       Bank Name
@@ -567,10 +585,18 @@ export default function EmployeePayslips() {
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-slate-500">
-                      Payment Mode
+                      IFSC Code
                     </p>
                     <p className="text-sm font-extrabold text-slate-900">
-                      {data?.bank?.mode || "Bank Transfer"}
+                      {data?.bank?.ifsc || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500">
+                      Branch
+                    </p>
+                    <p className="text-sm font-extrabold text-slate-900">
+                      {data?.bank?.branch || "-"}
                     </p>
                   </div>
                   <div>
@@ -582,24 +608,12 @@ export default function EmployeePayslips() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 rounded-2xl border bg-slate-50 px-4 py-3 text-xs text-slate-600">
-                <ShieldCheck size={14} />
-                This is a system-generated payslip and does not require a
-                signature.
-              </div>
-
               <div className="flex flex-wrap gap-2">
-                <PrimaryButton
-                  onClick={() => alert("Downloading payslip PDF...")}
-                  className="bg-indigo-600 text-white hover:bg-indigo-700"
-                >
-                  <Download size={16} />
-                  Download PDF
-                </PrimaryButton>
+                {/* Download PDF button removed as per request */}
 
                 <PrimaryButton
                   onClick={handlePrint}
-                  className="bg-white text-slate-900 border border-slate-200 hover:bg-slate-50"
+                  className="bg-white text-black border border-slate-200 hover:bg-slate-50"
                 >
                   <Printer size={16} />
                   Print

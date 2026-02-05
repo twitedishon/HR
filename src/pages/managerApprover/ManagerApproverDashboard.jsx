@@ -562,7 +562,7 @@ export default function ManagerDashboard() {
   }, [employees]);
 
   // IDs to exclude from the dashboard
-  const EXCLUDED_IDS = ["HR-PRIYA", "MGR-SUNIL", "EMP-023"];
+  const EXCLUDED_IDS = ["HR-PRIYA", "MGR-SUNIL", "EMP-023", "bcfc2301-7855-488e-a3b5-75a899836cf7"];
 
   const roleCounts = useMemo(() => {
     const counts = { employee: 0, manager: 0, hr: 0 };

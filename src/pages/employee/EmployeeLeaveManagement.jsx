@@ -544,17 +544,14 @@ function LeaveViewModal({ open, onClose, emp, data }) {
             />
           </div>
 
-          <div className="mt-3">
-            <InfoCard
-              label="Time"
-              value={
-                data.timeFrom && data.timeTo
-                  ? `${data.timeFrom} → ${data.timeTo}${data.hours ? ` • ${data.hours}` : ""
-                  }`
-                  : "-"
-              }
-            />
-          </div>
+          {data.timeFrom && data.timeTo ? (
+            <div className="mt-3">
+              <InfoCard
+                label="Time"
+                value={`${data.timeFrom} → ${data.timeTo}${data.hours ? ` • ${data.hours}` : ""}`}
+              />
+            </div>
+          ) : null}
 
           <div className="mt-3">
             <InfoCard label="Reason" value={data.reason || "-"} big />

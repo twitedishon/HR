@@ -23,6 +23,8 @@ const Navbar = ({ isSidebarOpen = true, onToggleSidebar }) => {
 
   useEffect(() => {
     let isActive = true;
+    const READ_KEY = "hrmss.notifications.read.approver";
+
     const fetchUnread = async () => {
       // Only count notifications for admin/approver employees, excluding HR-related notifications
       const { data, error } = await supabase
@@ -32,9 +34,19 @@ const Navbar = ({ isSidebarOpen = true, onToggleSidebar }) => {
         .in("audience", ["admin", "all"]);
 
       if (isActive && !error && data) {
+        // Get locally read IDs
+        let readIds = [];
+        try {
+          const raw = localStorage.getItem(READ_KEY);
+          readIds = raw ? JSON.parse(raw) : [];
+        } catch { }
+
         // Filter out HR-related notifications (these should only show for HR users)
         // Also filter out employee leave approval/rejection notifications
         const filteredCount = data.filter(n => {
+          // Check if locally read
+          if (readIds.includes(n.id)) return false;
+
           const title = String(n.title || "").toLowerCase();
           const detail = String(n.detail || "").toLowerCase();
           // Exclude HR leave request/approval notifications

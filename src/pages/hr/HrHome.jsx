@@ -316,9 +316,15 @@ export default function HrHome() {
           })
           .filter((row) => row.id);
 
+        const EXCLUDED_Admin_IDS = ["HR-001", "HR-PRIYA", "MGR-SUNIL", "lkjfhd"];
+
         const mappedAdmins = adminRes.error
           ? []
           : (adminRes.data || [])
+            .filter((row) => {
+              const id = row.employee_id || row.user_id || "";
+              return !EXCLUDED_Admin_IDS.includes(id);
+            })
             .map((row) => ({
               type: "admin",
               id: row.employee_id || row.user_id || "",
@@ -595,7 +601,7 @@ export default function HrHome() {
                 </th>
 
                 <th className="text-left px-4 py-3 font-semibold">Contact</th>
-                <th className="text-left px-4 py-3 font-semibold">Role / Dept</th>
+                <th className="text-left px-4 py-3 font-semibold">Designation</th>
 
                 <th className="text-right px-4 py-3 font-semibold">
                   <button type="button" onClick={() => toggleSort("joinedOn")} className="inline-flex items-center gap-2 hover:text-slate-900">
@@ -680,10 +686,7 @@ export default function HrHome() {
 
                     <td className="px-4 py-3">
                       {u.type === "employee" ? (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={deptBadge(u.department)}>{u.department}</span>
-                          <span className="text-xs text-slate-600 font-semibold">{u.designation}</span>
-                        </div>
+                        <div className="font-semibold text-slate-800">{u.designation}</div>
                       ) : (
                         <div className="font-semibold text-slate-800">{u.role}</div>
                       )}

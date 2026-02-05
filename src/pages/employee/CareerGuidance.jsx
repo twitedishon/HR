@@ -96,10 +96,10 @@ const CareerGuidance = () => {
     department.includes("product");
 
   const matrixData = isBusinessDev ? [
-    { icon: Briefcase, color: "text-purple-600", title: "Business Development Manager (BDM)", exp: "Minimum 5+ years" },
-    { icon: Users, color: "text-blue-500", title: "Sr. Business Development Executive (Sr.BDE)", exp: "3+ years" },
-    { icon: UserCheck, color: "text-teal-500", title: "Business Development Executive (BDE)", exp: "1–2 years" },
     { icon: GraduationCap, color: "text-orange-500", title: "Business Development Interns", exp: "Final-year MBA / Any graduate with sales interest" },
+    { icon: UserCheck, color: "text-teal-500", title: "Business Development Executive (BDE)", exp: "1–2 years" },
+    { icon: Users, color: "text-blue-500", title: "Sr. Business Development Executive (Sr.BDE)", exp: "3+ years" },
+    { icon: Briefcase, color: "text-purple-600", title: "Business Development Manager (BDM)", exp: "Minimum 5+ years" },
   ] : !isTechRole ? [
     { icon: UserPlus, color: "text-purple-500", title: "Trainee IT Recruiter", exp: "Fresher" },
     { icon: Phone, color: "text-blue-600", title: "IT Recruiter", exp: "> 1 year" },
