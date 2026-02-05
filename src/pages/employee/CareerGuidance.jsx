@@ -55,8 +55,8 @@ const CareerGuidance = () => {
         const jobData = profileRes?.data;
 
         setProfile({
-          designation: empData?.role || jobData?.designation || "Employee",
-          department: empData?.department || jobData?.department || "General",
+          designation: jobData?.designation || empData?.role || "Employee",
+          department: jobData?.department || empData?.department || "General",
         });
       } catch (err) {
         console.error("Error fetching career profile:", err);
@@ -93,7 +93,11 @@ const CareerGuidance = () => {
     designation.includes("ui/ux") ||
     department.includes("technology") ||
     department.includes("engineering") ||
-    department.includes("product");
+    department.includes("product") ||
+    department.includes("ai") ||
+    department.includes("intern") ||
+    department.includes("developer") ||
+    department.includes("ui/ux");
 
   const matrixData = isBusinessDev ? [
     { icon: GraduationCap, color: "text-orange-500", title: "Business Development Interns", exp: "Final-year MBA / Any graduate with sales interest" },
@@ -152,7 +156,6 @@ const CareerGuidance = () => {
             {/* Rungs */}
             {[...Array(rungCount)].map((_, i) => {
               const currentStep = matrixData.slice().reverse()[i];
-              const isSeniorSoftwareDev = currentStep?.title.toLowerCase().includes("senior software developer");
               const rungNumber = String(rungCount - i).padStart(2, "0");
 
               return (
@@ -163,18 +166,9 @@ const CareerGuidance = () => {
                 >
                   {/* Number on left side of rung */}
                   <span className="text-white font-bold text-xs">{rungNumber}</span>
-
-                  {/* Employee position indicator on ladder rung */}
-                  {isSeniorSoftwareDev && (
-                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center border-2 border-white shadow-md">
-                      <User size={12} className="text-white" />
-                    </div>
-                  )}
-
-                  {/* Empty space on right if no employee indicator */}
-                  {!isSeniorSoftwareDev && <div className="w-6 h-6"></div>}
                 </div>
               );
+
             })}
           </div>
 

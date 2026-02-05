@@ -15,18 +15,8 @@ const DashboardLayout = () => {
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
-      <div
-        className={`overflow-hidden transition-all duration-200 ${
-          isSidebarOpen ? "w-64" : "w-0"
-        }`}
-      >
-        <div
-          className={`transition-opacity duration-200 ${
-            isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-          }`}
-        >
-          <Sidebar />
-        </div>
+      <div className="flex-none">
+        <Sidebar isOpen={isSidebarOpen} />
       </div>
       <div className="flex flex-1 flex-col min-h-0">
         <Navbar

@@ -809,7 +809,7 @@ export default function LeaveManagement() {
                     <td className="px-4 py-3">
                       <div className="font-semibold">{r.leaveType}</div>
                       <div className="text-xs text-gray-500">
-                        #{String(r.id).slice(0, 8)} • Applied: {date} {time}
+                        Applied: {date} {time}
                       </div>
                       <div className="text-xs text-gray-600 mt-1">{r.reason}</div>
 
@@ -1126,7 +1126,6 @@ export default function LeaveManagement() {
                   Leave request
                 </p>
                 <div className="mt-1 flex items-center gap-2 flex-wrap">
-                  <span className="text-lg font-semibold">#{String(viewing.id).slice(0, 8)}</span>
                   <span className={pillDark()}>{viewing.status}</span>
                 </div>
               </div>

@@ -1548,9 +1548,7 @@ export default function PayrollPage() {
             <Detail label="Paid On" value={formatPeriodDisplay(periodKey)} />
           </div>
 
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-[11px] text-emerald-800">
-            This is a system-generated payslip and does not require a signature.
-          </div>
+
 
           <button
             type="button"

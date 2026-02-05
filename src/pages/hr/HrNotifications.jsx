@@ -575,14 +575,10 @@ export default function HrNotifications() {
           <div>
             <p className="text-xs uppercase tracking-wider text-white/80">HR Workspace</p>
             <h1 className="text-2xl font-bold mt-1">Notifications</h1>
-            <p className="text-sm text-white/80 mt-1">
-              HR feed from: Employees, Attendance, LeaveManagement, Payroll, Documents, My Profile, Birthday.
-            </p>
+
           </div>
 
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/15 px-3 py-1 text-xs font-semibold">
-            HR-facing feed <ChevronDown size={14} className="opacity-80" />
-          </div>
+
         </div>
 
         {/* CLICKABLE CARDS */}
