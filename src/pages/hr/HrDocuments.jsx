@@ -54,6 +54,7 @@ export default function HrDocuments() {
           mode="user"
           canUpload={true}
           showEmployee={false}
+          showStatus={false}
           categoryOptions={[
             "HR Policy",
             "Offer Letter",

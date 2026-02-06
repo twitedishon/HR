@@ -238,6 +238,7 @@ export default function DocumentManager({
   ],
   mode = "user", // "user" | "hr-review"
   showEmployee = false,
+  showStatus = true,
 }) {
   const theme = accentMap[accent] || accentMap.blue;
   const fileRef = useRef(null);
@@ -864,34 +865,32 @@ export default function DocumentManager({
     if (mode === "hr-review") {
       return (
         <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setSelectedDoc(d);
-              setSelectedAction("approved");
-              setNoteModalOpen(true);
-            }}
-            className="px-3 py-1.5 text-xs rounded-lg border bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-            disabled={busy || d.status !== "pending"}
-            title={d.status !== "pending" ? "Already reviewed" : undefined}
-          >
-            Approve
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setSelectedDoc(d);
-              setSelectedAction("rejected");
-              setNoteModalOpen(true);
-            }}
-            className="px-3 py-1.5 text-xs rounded-lg border bg-rose-50 text-rose-700 hover:bg-rose-100"
-            disabled={busy || d.status !== "pending"}
-            title={d.status !== "pending" ? "Already reviewed" : undefined}
-          >
-            Reject
-          </button>
+          {d.status === "pending" && (
+            <>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  updateStatus(d.id, "approved", null);
+                }}
+                className="px-3 py-1.5 text-xs rounded-lg border bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                disabled={busy}
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  updateStatus(d.id, "rejected", null);
+                }}
+                className="px-3 py-1.5 text-xs rounded-lg border bg-rose-50 text-rose-700 hover:bg-rose-100"
+                disabled={busy}
+              >
+                Reject
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={(e) => {
@@ -1109,10 +1108,10 @@ export default function DocumentManager({
             <thead className="bg-gray-50 text-gray-600">
               <tr>
                 <th className="px-4 py-3 text-left">Document</th>
-                <th className="px-4 py-3">Category</th>
-                {showEmployee && <th className="px-4 py-3">Employee</th>}
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Size</th>
+                <th className="px-4 py-3 text-left">Category</th>
+                {showEmployee && <th className="px-4 py-3 text-left">Employee</th>}
+                {showStatus && <th className="px-4 py-3 text-left">Status</th>}
+                <th className="px-4 py-3 text-left">Size</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -1141,9 +1140,11 @@ export default function DocumentManager({
                   </td>
                   <td className="px-4 py-3">{d.category}</td>
                   {showEmployee && <td className="px-4 py-3 text-xs text-slate-700">{d.employee || "-"}</td>}
-                  <td className="px-4 py-3">
-                    <StatusBadge status={d.status} />
-                  </td>
+                  {showStatus && (
+                    <td className="px-4 py-3">
+                      <StatusBadge status={d.status} />
+                    </td>
+                  )}
                   <td className="px-4 py-3">{formatBytes(d.size)}</td>
                   <td className="px-4 py-3">{renderActions(d)}</td>
                 </tr>
@@ -1163,7 +1164,7 @@ export default function DocumentManager({
                 <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${badgeColor(d.type)}`}>
                   {d.type}
                 </span>
-                <StatusBadge status={d.status} />
+                {showStatus && <StatusBadge status={d.status} />}
               </div>
               <h3 className="font-semibold truncate">{d.title}</h3>
               {showEmployee ? (
@@ -1185,53 +1186,7 @@ export default function DocumentManager({
           : "Connected to Supabase (Storage + DB). Users will see only their own documents (RLS) + role-based access."}
       </p> */}
 
-      {noteModalOpen && selectedDoc && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setNoteModalOpen(false)}>
-          <div
-            className="bg-white rounded-2xl p-4 w-full max-w-md shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs text-slate-500">Reviewing</p>
-                <p className="font-semibold text-slate-900 truncate">{selectedDoc.title}</p>
-              </div>
-              <button onClick={() => setNoteModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <X size={16} />
-              </button>
-            </div>
 
-            <textarea
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              placeholder="Add a note (optional)"
-              className="mt-3 w-full rounded-xl border px-3 py-2 text-sm"
-              rows={3}
-            />
-
-            <div className="flex justify-end gap-2 mt-3">
-              <button
-                onClick={() => setNoteModalOpen(false)}
-                className="px-3 py-1.5 text-xs rounded-lg border bg-white hover:bg-gray-50"
-                type="button"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => updateStatus(selectedDoc.id, selectedAction, noteText)}
-                className={`px-3 py-1.5 text-xs rounded-lg border font-semibold ${selectedAction === "approved"
-                  ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                  : "bg-rose-50 text-rose-700 hover:bg-rose-100"
-                  }`}
-                type="button"
-                disabled={busy}
-              >
-                {selectedAction === "approved" ? "Confirm Approve" : "Confirm Reject"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   );
 }
