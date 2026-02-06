@@ -96,6 +96,18 @@ const Navbar = ({ isSidebarOpen = true, onToggleSidebar }) => {
     };
   }, []);
 
+  // ✅ Listen for custom event when notification is viewed (immediate sync)
+  useEffect(() => {
+    const handleNotificationRead = () => {
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    };
+
+    window.addEventListener("approverNotificationRead", handleNotificationRead);
+    return () => {
+      window.removeEventListener("approverNotificationRead", handleNotificationRead);
+    };
+  }, []);
+
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();

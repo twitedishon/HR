@@ -665,11 +665,87 @@ export default function AdminNotifications() {
                 onMarkRead={() => markRead([n.id])}
                 onDelete={() => remove([n.id])}
                 onGoToSource={() => goToSource(n)}
+                onView={() => viewNotification(n)}
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* ✅ VIEW NOTIFICATION MODAL */}
+      {viewingNotif && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setViewingNotif(null)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-xl w-full max-w-md mx-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-white/20 grid place-items-center">
+                  <Bell size={18} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-xs text-white/70">{viewingNotif.source || "Notification"}</p>
+                  <p className="text-sm font-bold text-white">
+                    {(() => {
+                      const t = (viewingNotif.type || "info").toLowerCase();
+                      if (t === "success" || t === "approve") return "APPROVED";
+                      if (t === "danger" || t === "error" || t === "reject") return "REJECTED";
+                      if (t === "warning") return "REJECTED";
+                      if (t === "info") return "PENDING";
+                      return "INFO";
+                    })()}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewingNotif(null)}
+                className="h-8 w-8 rounded-full bg-white/20 hover:bg-white/30 grid place-items-center transition"
+              >
+                <X size={16} className="text-white" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">{viewingNotif.title || "Notification"}</h3>
+                <p className="text-sm text-slate-600 mt-2 leading-relaxed">{viewingNotif.detail || viewingNotif.message || "-"}</p>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <Clock3 size={14} />
+                <span>{viewingNotif.created_at ? new Date(viewingNotif.created_at).toLocaleString() : "-"}</span>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t flex items-center justify-between gap-3">
+              <button
+                onClick={() => setViewingNotif(null)}
+                className="text-sm font-semibold text-slate-600 hover:text-slate-800 transition"
+              >
+                Close
+              </button>
+              {(viewingNotif.route) && (
+                <button
+                  onClick={() => {
+                    setViewingNotif(null);
+                    goToSource(viewingNotif);
+                  }}
+                  className="px-4 py-2 text-sm font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition"
+                >
+                  Go to Details
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
