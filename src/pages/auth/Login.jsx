@@ -384,8 +384,14 @@ export default function Login() {
 
         const userId =
           session?.user_id || session?.id || session?.userId || null;
+
         const completed =
           isCompleted("hr") || (userId ? await appProfileExists(userId) : false);
+
+        if (completed) {
+          localStorage.setItem(COMPLETION_KEY("hr"), "true");
+        }
+
 
         const isHariPriya =
           String(hrEmail || "").trim().toLowerCase() ===
@@ -500,6 +506,12 @@ export default function Login() {
             (managerSession?.id
               ? await appProfileExists(managerSession.id)
               : false);
+
+          if (completed) {
+            localStorage.setItem(MANAGER_COMPLETION_KEY, "true");
+            localStorage.setItem(COMPLETION_KEY("manager"), "true");
+          }
+
 
           if (!completed) {
             navigate("/sign-in", {

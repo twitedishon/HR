@@ -874,7 +874,7 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
                         send(row.id, `row:${row.id}`);
                       }}
                     >
-                      {row.sent ? "Resend" : "Send"}
+                      Send
                     </button>
                   </div>
                 </div>

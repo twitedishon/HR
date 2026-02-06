@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
     ChevronLeft, ChevronRight, Calendar as CalendarIcon, Filter, Plus,
-    MoreHorizontal, Clock, CheckCircle2, XCircle, MapPin, Tag, Trash2, X
+    MoreHorizontal, Clock, CheckCircle2, XCircle, MapPin, Tag, Trash2, X, Pencil
 } from 'lucide-react';
 
 const LeaveCalendar = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [showAddModal, setShowAddModal] = useState(false);
+    const [editId, setEditId] = useState(null); // ✅ Track which event is being edited
 
     // Helper to get current user ID for storage key
     const getUserId = () => {
@@ -58,8 +59,6 @@ const LeaveCalendar = () => {
                     ...e,
                     date: new Date(e.date)
                 }));
-                // Filter out old holidays if any, or just merge user notes with official holidays
-                // For simplicity, we'll keep user notes and ensure holidays are present
                 const userNotes = parsed.filter(e => e.type !== 'Holiday');
                 return [...officialHolidays, ...userNotes];
             } catch (e) {
@@ -125,7 +124,8 @@ const LeaveCalendar = () => {
 
     const handleDateClick = (day) => {
         setSelectedDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), day));
-        setShowAddModal(false); // Close add mode if open to switch view
+        setShowAddModal(false);
+        setEditId(null); // Reset edit mode when changing date
     };
 
     const handleAddEvent = (e) => {
@@ -134,20 +134,45 @@ const LeaveCalendar = () => {
 
         const finalCategory = newEvent.category === 'Other' ? (newEvent.customCategory || 'Other') : newEvent.category;
 
-        const event = {
-            id: Date.now(),
-            date: selectedDate,
-            type: 'Note',
-            category: finalCategory,
-            title: newEvent.title,
-            time: newEvent.time,
-            description: newEvent.description,
-            color: newEvent.color
-        };
+        if (editId) {
+            // ✅ Update existing event
+            setEvents(events.map(ev =>
+                ev.id === editId
+                    ? { ...ev, category: finalCategory, title: newEvent.title, time: newEvent.time, description: newEvent.description, color: newEvent.color }
+                    : ev
+            ));
+            setEditId(null);
+        } else {
+            // ✅ Create new event
+            const event = {
+                id: Date.now(),
+                date: selectedDate,
+                type: 'Note',
+                category: finalCategory,
+                title: newEvent.title,
+                time: newEvent.time,
+                description: newEvent.description,
+                color: newEvent.color
+            };
+            setEvents([...events, event]);
+        }
 
-        setEvents([...events, event]);
         setNewEvent({ title: '', category: 'Meeting', customCategory: '', time: '', description: '', color: 'blue' });
         setShowAddModal(false);
+    };
+
+    // ✅ New: Handle edit click
+    const handleEditEvent = (event) => {
+        setNewEvent({
+            title: event.title,
+            category: categories.find(c => c.name === event.category) ? event.category : 'Other',
+            customCategory: categories.find(c => c.name === event.category) ? '' : event.category,
+            time: event.time || '',
+            description: event.description || '',
+            color: event.color || 'blue'
+        });
+        setEditId(event.id);
+        setShowAddModal(true);
     };
 
     const handleDeleteEvent = (id) => {
@@ -164,7 +189,6 @@ const LeaveCalendar = () => {
     const firstDay = getFirstDayOfMonth(currentDate);
     const blanks = Array.from({ length: firstDay }, (_, i) => i);
 
-    // Filter events for the calendar view (current month)
     const getEventsForDay = (day) => {
         return events.filter(e =>
             e.date.getDate() === day &&
@@ -173,7 +197,6 @@ const LeaveCalendar = () => {
         );
     };
 
-    // Get events for the selected date (side panel)
     const selectedDateEvents = events.filter(e =>
         e.date.getDate() === selectedDate.getDate() &&
         e.date.getMonth() === selectedDate.getMonth() &&
@@ -193,8 +216,7 @@ const LeaveCalendar = () => {
             currentDate.getFullYear() === selectedDate.getFullYear();
     };
 
-    // Helper for dynamic Tailwind classes based on color name
-    const getColorClasses = (color, variant = 'bg') => {
+    const getColorClasses = (color) => {
         const map = {
             blue: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', dot: 'bg-blue-500', hover: 'hover:bg-blue-100' },
             emerald: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500', hover: 'hover:bg-emerald-100' },
@@ -213,7 +235,6 @@ const LeaveCalendar = () => {
         <div className="h-[calc(100vh-140px)] flex gap-6 animate-fadeIn">
             {/* LEFT: Calendar Grid (2/3) */}
             <div className="flex-1 flex flex-col bg-white border border-slate-200 rounded-2xl shadow-sm overflow-y-auto">
-                {/* Header */}
                 <div className="p-4 flex items-center justify-between border-b border-slate-100">
                     <div>
                         <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -228,7 +249,6 @@ const LeaveCalendar = () => {
                     </div>
                 </div>
 
-                {/* Grid Header */}
                 <div className="grid grid-cols-7 bg-slate-50/50 border-b border-slate-100">
                     {weekDays.map(day => (
                         <div key={day} className="py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">
@@ -237,7 +257,6 @@ const LeaveCalendar = () => {
                     ))}
                 </div>
 
-                {/* Days */}
                 <div className="grid grid-cols-7 flex-1 auto-rows-fr">
                     {blanks.map((_, i) => (
                         <div key={`blank-${i}`} className="bg-slate-50/20 border-b border-r border-slate-100 p-2" />
@@ -247,7 +266,6 @@ const LeaveCalendar = () => {
                         const dayEvents = getEventsForDay(day);
                         const today = isToday(day);
                         const selected = isSelected(day);
-
                         const dateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
                         const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
 
@@ -271,7 +289,6 @@ const LeaveCalendar = () => {
                                         {day}
                                     </span>
 
-                                    {/* Dots indicator for multiple events */}
                                     {dayEvents.length > 0 && (
                                         <div className="flex -space-x-1">
                                             {dayEvents.slice(0, 3).map((ev, i) => (
@@ -282,7 +299,6 @@ const LeaveCalendar = () => {
                                     )}
                                 </div>
 
-                                {/* Tiny Label for first event */}
                                 {dayEvents.length > 0 && (
                                     <div className={`mt-auto text-[10px] truncate px-1.5 py-0.5 rounded-sm ${getColorClasses(dayEvents[0].color).bg} ${getColorClasses(dayEvents[0].color).text}`}>
                                         {dayEvents[0].title}
@@ -297,7 +313,6 @@ const LeaveCalendar = () => {
 
             {/* RIGHT: Side Panel (1/3) */}
             <div className="w-80 flex flex-col gap-4 animate-slideInRight">
-                {/* Selected Date Header */}
                 <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
                         <div>
@@ -309,7 +324,11 @@ const LeaveCalendar = () => {
                             </p>
                         </div>
                         <button
-                            onClick={() => setShowAddModal(true)}
+                            onClick={() => {
+                                setNewEvent({ title: '', category: 'Meeting', customCategory: '', time: '', description: '', color: 'blue' });
+                                setEditId(null);
+                                setShowAddModal(true);
+                            }}
                             className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-200 transition-all active:scale-95"
                             title="Add Note"
                         >
@@ -319,7 +338,6 @@ const LeaveCalendar = () => {
 
                     <div className="h-px bg-slate-100 my-4" />
 
-                    {/* Events List */}
                     <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
                         {selectedDateEvents.length === 0 ? (
                             <div className="text-center py-8 text-slate-400">
@@ -328,7 +346,11 @@ const LeaveCalendar = () => {
                                 </div>
                                 <p className="text-sm">No events for this day</p>
                                 <button
-                                    onClick={() => setShowAddModal(true)}
+                                    onClick={() => {
+                                        setNewEvent({ title: '', category: 'Meeting', customCategory: '', time: '', description: '', color: 'blue' });
+                                        setEditId(null);
+                                        setShowAddModal(true);
+                                    }}
                                     className="mt-2 text-indigo-600 text-xs font-semibold hover:underline"
                                 >
                                     Add a note
@@ -343,12 +365,23 @@ const LeaveCalendar = () => {
                                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/50 ${colors.text} uppercase tracking-wider`}>
                                                 {event.category}
                                             </span>
-                                            <button
-                                                onClick={() => handleDeleteEvent(event.id)}
-                                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/50 rounded text-slate-400 hover:text-rose-500 transition-all"
-                                            >
-                                                <Trash2 size={12} />
-                                            </button>
+                                            {/* ✅ Edit/Delete Actions */}
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                                <button
+                                                    onClick={() => handleEditEvent(event)}
+                                                    className="p-1 hover:bg-white/50 rounded text-slate-400 hover:text-indigo-600 transition-all"
+                                                    title="Edit"
+                                                >
+                                                    <Pencil size={12} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteEvent(event.id)}
+                                                    className="p-1 hover:bg-white/50 rounded text-slate-400 hover:text-rose-500 transition-all"
+                                                    title="Delete"
+                                                >
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            </div>
                                         </div>
                                         <h4 className={`font-semibold text-sm ${colors.text} leading-tight`}>{event.title}</h4>
                                         {event.time && (
@@ -368,16 +401,18 @@ const LeaveCalendar = () => {
                     </div>
                 </div>
 
-                {/* Add Note Form (Conditional or Always visible depending on UX, here using conditional overlay style inside panel or replacing list) */}
                 {showAddModal && (
                     <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xl animate-scaleIn relative">
                         <button
-                            onClick={() => setShowAddModal(false)}
+                            onClick={() => {
+                                setShowAddModal(false);
+                                setEditId(null);
+                            }}
                             className="absolute top-3 right-3 text-slate-400 hover:text-slate-600"
                         >
                             <X size={16} />
                         </button>
-                        <h3 className="font-bold text-slate-800 mb-4">Add Note</h3>
+                        <h3 className="font-bold text-slate-800 mb-4">{editId ? 'Edit Note' : 'Add Note'}</h3>
                         <form onSubmit={handleAddEvent} className="space-y-3">
                             <div>
                                 <label className="text-xs font-semibold text-slate-500 mb-1 block">Title</label>
@@ -410,7 +445,6 @@ const LeaveCalendar = () => {
                                             onChange={e => setNewEvent({ ...newEvent, customCategory: e.target.value })}
                                             className="w-full mt-2 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                                             placeholder="Enter custom category"
-                                            autoFocus
                                         />
                                     )}
                                 </div>
@@ -454,7 +488,7 @@ const LeaveCalendar = () => {
                                 type="submit"
                                 className="w-full py-2.5 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-black transition-all shadow-md"
                             >
-                                Save Note
+                                {editId ? 'Update Note' : 'Save Note'}
                             </button>
                         </form>
                     </div>
