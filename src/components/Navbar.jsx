@@ -26,12 +26,36 @@ const Navbar = ({ isSidebarOpen = true, onToggleSidebar }) => {
     const READ_KEY = "hrmss.notifications.read.approver";
 
     const fetchUnread = async () => {
-      // Only count notifications for admin/approver employees, excluding HR-related notifications
+      // Get current user ID from auth session
+      let currentUserId = null;
+      try {
+        const authSession = localStorage.getItem(AUTH_KEY);
+        if (authSession) {
+          const parsed = JSON.parse(authSession);
+          currentUserId = parsed?.employee_id || parsed?.admin_id || parsed?.id || null;
+        }
+      } catch { }
+
+      // Fetch global notifications for admin/approver employees
       const { data, error } = await supabase
         .from(NOTIF_TABLE)
         .select("id, title, detail")
         .eq("unread", true)
         .in("audience", ["admin", "all"]);
+
+      // ✅ Also fetch personal approval notifications from employee_notifications
+      let personalUnreadCount = 0;
+      if (currentUserId) {
+        const { count, error: personalError } = await supabase
+          .from("employee_notifications")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", currentUserId)
+          .eq("unread", true);
+
+        if (!personalError && count) {
+          personalUnreadCount = count;
+        }
+      }
 
       if (isActive && !error && data) {
         // Get locally read IDs
@@ -42,7 +66,6 @@ const Navbar = ({ isSidebarOpen = true, onToggleSidebar }) => {
         } catch { }
 
         // Filter out HR-related notifications (these should only show for HR users)
-        // Also filter out employee leave approval/rejection notifications
         const filteredCount = data.filter(n => {
           // Check if locally read
           if (readIds.includes(n.id)) return false;
@@ -53,13 +76,14 @@ const Navbar = ({ isSidebarOpen = true, onToggleSidebar }) => {
           if (title.includes("hr") || detail.includes("hr sent") || detail.includes("hr admin")) {
             return false;
           }
-          // Exclude employee leave approval/rejection notifications (they show "Your ... request was approved/rejected")
-          if (detail.includes("your") && (detail.includes("request was approved") || detail.includes("request was rejected") || detail.includes("request was updated"))) {
-            return false;
-          }
           return true;
         }).length;
-        setUnreadCount(filteredCount);
+
+        // ✅ Combine global notifications count with personal notifications count
+        setUnreadCount(filteredCount + personalUnreadCount);
+      } else if (isActive) {
+        // If global query fails, at least show personal notification count
+        setUnreadCount(personalUnreadCount);
       }
     };
 

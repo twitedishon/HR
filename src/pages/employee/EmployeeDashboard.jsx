@@ -103,7 +103,18 @@ function readCachedEmployeeProfile(empId) {
   return safeJsonParse(localStorage.getItem(`${PROFILE_CACHE_PREFIX}${empId}`));
 }
 
-function calcLeaveDays(from, to) {
+function calcLeaveDays(from, to, leaveType = "") {
+  // Check if this is a half-day leave type
+  const normalizedType = String(leaveType || "").toLowerCase().trim();
+  if (HALF_DAY_TYPES.has(normalizedType)) {
+    return 0.5;
+  }
+
+  // Also check if leave type contains "half day" or "permission"
+  if (normalizedType.includes("half day") || normalizedType.includes("permission")) {
+    return 0.5;
+  }
+
   if (!from || !to) return 1;
   const f = new Date(from);
   const t = new Date(to);
@@ -469,12 +480,13 @@ export default function EmployeeDashboard() {
         const mapped = (rows || []).map((row) => {
           const from = row.from_date ? String(row.from_date) : "";
           const to = row.to_date ? String(row.to_date) : from;
+          const leaveType = row.leave_type || "-";
           return {
             id: row.id,
-            type: row.leave_type || "-",
+            type: leaveType,
             from,
             to,
-            days: calcLeaveDays(from, to),
+            days: calcLeaveDays(from, to, leaveType),
             status: row.status || "Pending",
             reason: row.reason || "-",
           };

@@ -281,10 +281,17 @@ const ApproverEmployeeDashboard = () => {
     }
 
     // Fetch admin's own leave requests to calculate leave balance
-    // Try fetching by employee_id and also by admin_id, and by name
+    // Fetch from BOTH admin_leaves and hrmss_leave_requests to get the correct status
     const adminLeavesRes = await supabase
       .from(ADMIN_LEAVES_TABLE)
       .select("id, leave_type, from_date, to_date, status, reason, applied_at, admin_id, admin_name")
+      .order("applied_at", { ascending: false });
+
+    // Also fetch from hrmss_leave_requests to get the actual approval status
+    const routingLeavesRes = await supabase
+      .from(LEAVES_TABLE)
+      .select("id, leave_type, from_date, to_date, status, reason, applied_at, owner_id, owner_name, owner_role")
+      .eq("owner_role", "admin")
       .order("applied_at", { ascending: false });
 
     if (adminLeavesRes.data) {
@@ -301,16 +308,42 @@ const ApproverEmployeeDashboard = () => {
         );
       });
 
+      // Build a map of from_date + leave_type -> status from hrmss_leave_requests
+      // This gives us the TRUE status from the approval table
+      const routingStatusMap = new Map();
+      (routingLeavesRes.data || []).forEach((row) => {
+        const ownerId = String(row.owner_id || "").toLowerCase();
+        // Only consider Hari Priya's leaves
+        if (ownerId === "emp-029" || ownerId === "adm-029") {
+          const key = `${row.from_date}_${row.leave_type}`;
+          // If we have multiple routing entries (manager, hr), use any non-Pending status
+          const existingStatus = routingStatusMap.get(key);
+          if (!existingStatus || existingStatus === "Pending") {
+            routingStatusMap.set(key, row.status);
+          }
+        }
+      });
+
+      console.log("[Dashboard] Routing status map:", Object.fromEntries(routingStatusMap));
+
       const mapped = hariPriyaLeaves.map((row) => {
         const from = row.from_date ? String(row.from_date) : "";
         const to = row.to_date ? String(row.to_date) : from;
+
+        // Use status from hrmss_leave_requests if available (source of truth)
+        const routingKey = `${from}_${row.leave_type}`;
+        const routingStatus = routingStatusMap.get(routingKey);
+        const finalStatus = routingStatus || row.status || "Pending";
+
+        console.log(`[Dashboard] Leave ${row.id}: admin_leaves=${row.status}, routing=${routingStatus}, final=${finalStatus}`);
+
         return {
           id: row.id,
           type: row.leave_type || "-",
           from,
           to,
           days: diffDaysInclusive(from, to),
-          status: row.status || "Pending",
+          status: finalStatus,
           reason: row.reason || "-",
         };
       });
@@ -468,6 +501,27 @@ const ApproverEmployeeDashboard = () => {
     fetchDashboardData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKeys]);
+
+  // Real-time subscription to admin_leaves table for automatic status updates
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin_leaves_dashboard_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: ADMIN_LEAVES_TABLE },
+        (payload) => {
+          console.log("[Dashboard] admin_leaves change detected:", payload);
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   const recentLeaves = useMemo(
     () => (pendingLeaves || []).slice(0, 4),

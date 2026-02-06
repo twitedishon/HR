@@ -526,7 +526,19 @@ function LeaveViewModal({ open, onClose, emp, data }) {
             <InfoCard label="To" value={toDMY(data.to)} />
             <InfoCard
               label="Days"
-              value={data.mode === "Full Day" ? "1" : "1"}
+              value={(() => {
+                // For half day or permission, always 1 day
+                if (data.mode === "Half Day" || data.mode === "Permission") return "0.5";
+                // Calculate days between from and to (inclusive)
+                const from = new Date(data.from);
+                const to = new Date(data.to);
+                if (isNaN(from.getTime()) || isNaN(to.getTime())) return "1";
+                from.setHours(0, 0, 0, 0);
+                to.setHours(0, 0, 0, 0);
+                const diffMs = to - from;
+                const days = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
+                return String(Math.max(days, 1));
+              })()}
             />
             <InfoCard
               label="Applied"

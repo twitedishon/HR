@@ -264,7 +264,28 @@ export default function ManagerApprovals() {
     const ownerRoleForUpdate = String(requestRecord.ownerRole || "").toLowerCase();
     if (ownerRoleForUpdate === "admin" && requestRecord.ownerId) {
       try {
-        const { error: adminLeaveErr } = await supabase
+        console.log("[ManagerApproverApprovals] Updating admin_leaves for:", {
+          ownerId: requestRecord.ownerId,
+          fromDate: requestRecord.fromDate,
+          leaveType: requestRecord.leaveType,
+          nextStatus,
+        });
+
+        // First, try to find matching pending leave in admin_leaves
+        const { data: matchingLeaves, error: findErr } = await supabase
+          .from("admin_leaves")
+          .select("id, admin_id, from_date, leave_type, status")
+          .eq("admin_id", requestRecord.ownerId)
+          .eq("status", "Pending");
+
+        if (findErr) {
+          console.warn("[ManagerApproverApprovals] Error finding admin_leaves:", findErr);
+        } else {
+          console.log("[ManagerApproverApprovals] Found pending admin_leaves:", matchingLeaves);
+        }
+
+        // Match by admin_id, from_date, and optionally leave_type
+        const { data: updateResult, error: adminLeaveErr } = await supabase
           .from("admin_leaves")
           .update({
             status: nextStatus,
@@ -273,15 +294,37 @@ export default function ManagerApprovals() {
           })
           .eq("admin_id", requestRecord.ownerId)
           .eq("from_date", requestRecord.fromDate)
-          .eq("status", "Pending");
+          .eq("status", "Pending")
+          .select();
 
         if (adminLeaveErr) {
-          console.warn("admin_leaves update error:", adminLeaveErr);
+          console.warn("[ManagerApproverApprovals] admin_leaves update error:", adminLeaveErr);
+        } else if (!updateResult || updateResult.length === 0) {
+          // No rows matched - try more flexible matching without from_date exact match
+          console.log("[ManagerApproverApprovals] No exact match found, trying flexible match...");
+
+          const { data: flexibleUpdate, error: flexErr } = await supabase
+            .from("admin_leaves")
+            .update({
+              status: nextStatus,
+              decided_at: new Date().toISOString().slice(0, 10),
+              decided_by_name: session.name || "Founder",
+            })
+            .eq("admin_id", requestRecord.ownerId)
+            .eq("leave_type", requestRecord.leaveType)
+            .eq("status", "Pending")
+            .select();
+
+          if (flexErr) {
+            console.warn("[ManagerApproverApprovals] Flexible admin_leaves update error:", flexErr);
+          } else {
+            console.log("[ManagerApproverApprovals] Flexible update result:", flexibleUpdate);
+          }
         } else {
-          console.log("admin_leaves status updated for:", requestRecord.ownerId);
+          console.log("[ManagerApproverApprovals] admin_leaves status updated successfully:", updateResult);
         }
       } catch (e) {
-        console.warn("admin_leaves update failed:", e);
+        console.warn("[ManagerApproverApprovals] admin_leaves update failed:", e);
       }
     }
 

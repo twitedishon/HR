@@ -68,14 +68,24 @@ export default function ManagerNotifications() {
   const handleNotificationClick = async (notification) => {
     // Mark as read
     if (notification.unread) {
+      // ✅ Optimistic update - immediately update local state
+      setAlerts((prev) =>
+        prev.map((n) => (n.id === notification.id ? { ...n, unread: false } : n))
+      );
+
+      // ✅ Dispatch custom event to sync notification count in layout immediately
+      window.dispatchEvent(new CustomEvent("notificationRead", { detail: { id: notification.id } }));
+
       const { error } = await supabase
         .from(TABLE)
         .update({ unread: false })
         .eq("id", notification.id);
 
-      if (!error) {
+      if (error) {
+        console.warn("[ManagerNotifications] Failed to mark notification as read:", error);
+        // Revert optimistic update on error
         setAlerts((prev) =>
-          prev.map((n) => (n.id === notification.id ? { ...n, unread: false } : n))
+          prev.map((n) => (n.id === notification.id ? { ...n, unread: true } : n))
         );
       }
     }
@@ -155,10 +165,15 @@ export default function ManagerNotifications() {
               <div
                 key={a.id}
                 onClick={() => handleNotificationClick(a)}
-                className={`rounded-2xl border bg-white p-4 shadow-sm flex items-start gap-3 ${isClickable ? "cursor-pointer hover:bg-slate-50 transition-colors" : ""
-                  }`}
+                className={`rounded-2xl border p-4 shadow-sm flex items-start gap-3 transition-all duration-200 ${a.unread
+                    ? "bg-indigo-50 border-indigo-200 ring-2 ring-indigo-100"
+                    : "bg-white border-gray-200"
+                  } ${isClickable ? "cursor-pointer hover:bg-slate-100" : ""}`}
               >
-                <div className="h-10 w-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 shrink-0">
+                <div className={`h-10 w-10 rounded-xl border flex items-center justify-center shrink-0 ${a.unread
+                    ? "bg-indigo-100 border-indigo-200 text-indigo-700"
+                    : "bg-slate-50 border-slate-100 text-slate-500"
+                  }`}>
                   <Bell size={16} />
                 </div>
                 <div className="flex-1 min-w-0">

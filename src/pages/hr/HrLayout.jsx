@@ -84,6 +84,19 @@ export default function HrLayout() {
     return () => supabase.removeChannel(channel);
   }, []);
 
+  // ✅ Listen for custom event when notification is viewed (immediate sync)
+  useEffect(() => {
+    const handleNotificationRead = () => {
+      console.log("[HrLayout] hrNotificationRead event received - decrementing count");
+      setNotifCount((prev) => Math.max(0, prev - 1));
+    };
+
+    window.addEventListener("hrNotificationRead", handleNotificationRead);
+    return () => {
+      window.removeEventListener("hrNotificationRead", handleNotificationRead);
+    };
+  }, []);
+
   const handleLogout = () => {
     try {
       sessionStorage.removeItem(DOCS_AUTH_KEY);

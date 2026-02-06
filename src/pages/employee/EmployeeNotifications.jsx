@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bell, Info, Clock3, RefreshCw } from "lucide-react";
+import { Bell, Info, Clock3, RefreshCw, Eye, X } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 
 const TABLE = "employee_notifications";
@@ -17,6 +17,7 @@ export default function EmployeeNotifications() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [viewingNotif, setViewingNotif] = useState(null); // ✅ Modal state
 
   const fetchNotifications = async () => {
     try {
@@ -89,15 +90,37 @@ export default function EmployeeNotifications() {
     }
   };
 
+  // ✅ Mark as read with optimistic update and custom event dispatch
   const markRead = async (id) => {
     if (!id) return;
+
+    // Check if this notification is currently unread
+    const notification = rows.find(n => n.id === id);
+    if (!notification?.unread) return;
+
+    // ✅ Optimistic update
+    setRows((prev) => prev.map((n) => (n.id === id ? { ...n, unread: false } : n)));
+
+    // ✅ Dispatch custom event for immediate count sync in layout
+    window.dispatchEvent(new CustomEvent("employeeNotificationRead"));
+
     const { error } = await supabase
       .from(TABLE)
       .update({ unread: false })
       .eq("id", id);
 
-    if (!error) {
-      setRows((prev) => prev.map((n) => (n.id === id ? { ...n, unread: false } : n)));
+    if (error) {
+      console.warn("[EmployeeNotifications] Error marking as read:", error);
+      // Revert optimistic update on error
+      setRows((prev) => prev.map((n) => (n.id === id ? { ...n, unread: true } : n)));
+    }
+  };
+
+  // ✅ View notification - opens modal and marks as read
+  const viewNotification = async (n) => {
+    setViewingNotif(n);
+    if (n.unread) {
+      await markRead(n.id);
     }
   };
 
@@ -152,11 +175,15 @@ export default function EmployeeNotifications() {
           <EmptyState />
         ) : (
           rows.map((n) => {
+            // ✅ Convert type to display label
             let typeLabel = n.type || "info";
-            if (typeLabel === "success") typeLabel = "approve";
-            if (typeLabel === "error") typeLabel = "reject";
+            let displayLabel = typeLabel;
+            if (typeLabel === "success" || typeLabel === "approve") displayLabel = "Approved";
+            if (typeLabel === "error" || typeLabel === "reject") displayLabel = "Rejected";
+            if (typeLabel === "warning") displayLabel = "Pending";
+            if (typeLabel === "info") displayLabel = "Info";
 
-            const toneCls = tone[typeLabel] || tone[n.type] || tone.info;
+            const toneCls = tone[typeLabel] || tone.info;
 
             return (
               <div
@@ -167,7 +194,7 @@ export default function EmployeeNotifications() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
                       <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border bg-white/60 backdrop-blur-sm shadow-sm`}>
-                        {String(typeLabel).toUpperCase()}
+                        {displayLabel.toUpperCase()}
                       </span>
                       {n.category ? <span className="text-slate-500">· {n.category}</span> : null}
                     </div>
@@ -178,27 +205,19 @@ export default function EmployeeNotifications() {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
-                    {n.route ? (
-                      <a
-                        href={n.route}
-                        className="text-xs font-semibold text-blue-600 hover:text-blue-800"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        View
-                      </a>
-                    ) : null}
-
-                    {n.unread && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          markRead(n.id);
-                        }}
-                        className="text-xs font-semibold text-slate-500 hover:text-slate-800"
-                      >
-                        Mark read
-                      </button>
-                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        viewNotification(n);
+                      }}
+                      className={`text-xs font-semibold inline-flex items-center gap-1 px-2 py-1 rounded-lg border transition ${n.unread
+                        ? "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                        }`}
+                    >
+                      <Eye size={12} />
+                      View
+                    </button>
                   </div>
                 </div>
               </div>
@@ -206,6 +225,78 @@ export default function EmployeeNotifications() {
           })
         )}
       </div>
+
+      {/* ✅ VIEW NOTIFICATION MODAL */}
+      {viewingNotif && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setViewingNotif(null)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-xl w-full max-w-md mx-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-white/20 grid place-items-center">
+                  <Bell size={18} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-xs text-white/70">{viewingNotif.category || "Notification"}</p>
+                  <p className="text-sm font-bold text-white">
+                    {(() => {
+                      const t = (viewingNotif.type || "info").toLowerCase();
+                      if (t === "success" || t === "approve") return "APPROVED";
+                      if (t === "error" || t === "reject") return "REJECTED";
+                      if (t === "warning") return "PENDING";
+                      return "INFO";
+                    })()}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewingNotif(null)}
+                className="h-8 w-8 rounded-full bg-white/20 hover:bg-white/30 grid place-items-center transition"
+              >
+                <X size={16} className="text-white" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">{viewingNotif.title || "Notification"}</h3>
+                <p className="text-sm text-slate-600 mt-2 leading-relaxed">{viewingNotif.message || "-"}</p>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <Clock3 size={14} />
+                <span>{viewingNotif.created_at ? new Date(viewingNotif.created_at).toLocaleString() : "-"}</span>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t flex items-center justify-between gap-3">
+              <button
+                onClick={() => setViewingNotif(null)}
+                className="text-sm font-semibold text-slate-600 hover:text-slate-800 transition"
+              >
+                Close
+              </button>
+              {viewingNotif.route && (
+                <a
+                  href={viewingNotif.route}
+                  onClick={() => setViewingNotif(null)}
+                  className="px-4 py-2 text-sm font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition"
+                >
+                  Go to Details
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,10 +9,18 @@ const APPROVERS_TABLE = "hrmss_approvers";
 const LEAVES_TABLE = "hrmss_leave_requests";
 const ADMIN_LEAVES_TABLE = "admin_leaves";
 
-/* ✅ UPDATED: Get real HR from storage if possible */
+/* ✅ UPDATED: Get real HR from storage - always use employee_id, never UUID */
 const getHRFromStorage = () => {
   if (typeof window === "undefined") return { id: "HR-001", name: "HR" };
   const likelyKeys = ["HRMSS_AUTH_SESSION", "hrmss.session", "hrmss.auth"];
+
+  // Helper to check if a string looks like a UUID (to avoid using it as HR ID)
+  const isUUID = (str) => {
+    if (!str || typeof str !== "string") return false;
+    // UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+  };
+
   for (const k of likelyKeys) {
     const raw = localStorage.getItem(k);
     if (!raw) continue;
@@ -21,8 +29,24 @@ const getHRFromStorage = () => {
       const user = parsed?.user || parsed;
       const role = String(user?.role || user?.login_role || "").toLowerCase();
       if (role.includes("hr")) {
+        // Prioritize employee_id, then check if id is NOT a UUID
+        let hrId = user?.employee_id;
+        if (!hrId || isUUID(hrId)) {
+          // Check other possible fields for HR ID
+          hrId = user?.hr_id || user?.emp_id;
+        }
+        if (!hrId || isUUID(hrId)) {
+          // If id field exists but is a UUID, don't use it - fallback to HR-001
+          const userId = user?.id;
+          if (userId && !isUUID(userId)) {
+            hrId = userId;
+          } else {
+            hrId = "HR-001";
+          }
+        }
+
         return {
-          id: user?.employee_id || user?.id || "HR-001",
+          id: hrId,
           name: user?.full_name || user?.name || "HR Admin",
         };
       }
@@ -448,6 +472,26 @@ export default function LeaveManagement() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode]);
 
+  // Real-time subscription to hrmss_leave_requests for automatic status updates
+  useEffect(() => {
+    const channel = supabase
+      .channel("hr_leave_management_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: LEAVES_TABLE },
+        (payload) => {
+          console.log("[HR LeaveManagement] Leave request change detected:", payload);
+          fetchRequests();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode]);
+
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape") {
@@ -593,6 +637,7 @@ export default function LeaveManagement() {
         leaveType: applyLeaveType,
         fromDate: applyFrom,
         toDate: needsTime(applyMode) ? applyFrom : applyTo,
+        ownerRole: "hr", // ✅ Added to identify HR's own leave request
       });
     } catch (notifErr) {
       console.warn("Manager notification failed:", notifErr?.message || notifErr);

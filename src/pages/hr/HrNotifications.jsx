@@ -11,9 +11,10 @@ import {
   Check,
   Trash2,
   Clock3,
-  MailOpen,
+  Eye,
   ShieldCheck,
   ChevronDown,
+  X,
 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -217,7 +218,7 @@ function NotificationRow({
   n,
   selected,
   onToggleSelect,
-  onMarkRead,
+  onView,
   onDelete,
   onGoToSource,
 }) {
@@ -321,20 +322,18 @@ function NotificationRow({
                   Go to {n.source}
                 </button>
 
-                {n.unread ? (
-                  <button
-                    onClick={onMarkRead}
-                    className="text-[11px] font-semibold rounded-full border px-3 py-1 inline-flex items-center gap-1"
-                    style={{
-                      borderColor: rgba(SAGE, 0.35),
-                      backgroundColor: rgba("#ffffff", 0.65),
-                    }}
-                    title="Mark as read"
-                  >
-                    <MailOpen size={12} />
-                    Mark read
-                  </button>
-                ) : null}
+                <button
+                  onClick={onView}
+                  className="text-[11px] font-semibold rounded-full border px-3 py-1 inline-flex items-center gap-1"
+                  style={{
+                    borderColor: rgba(SAGE, 0.35),
+                    backgroundColor: n.unread ? "rgba(99, 102, 241, 0.15)" : rgba("#ffffff", 0.65),
+                  }}
+                  title="View details"
+                >
+                  <Eye size={12} />
+                  View
+                </button>
 
                 <button
                   onClick={onDelete}
@@ -364,6 +363,7 @@ export default function HrNotifications() {
 
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
+  const [viewingNotif, setViewingNotif] = useState(null); // ✅ Modal state for viewing notification
 
   const [q, setQ] = useState("");
   const [type, setType] = useState("All");
@@ -508,26 +508,44 @@ export default function HrNotifications() {
   const clearSelection = () => setSelected(new Set());
   const selectAllFiltered = () => setSelected(() => new Set(filtered.map((x) => x.id)));
 
-  // ✅ mark read (DB update)
+  // ✅ mark read (DB update) with immediate count sync
   const markRead = async (ids) => {
     if (!ids?.length) return;
+
+    // ✅ Optimistic update - immediately update local state
+    const unreadCount = ids.filter(id => items.find(x => x.id === id)?.unread).length;
+    setItems((prev) => prev.map((x) => (ids.includes(x.id) ? { ...x, unread: false } : x)));
+
+    // ✅ Dispatch custom event for each unread notification to sync count in layout
+    for (let i = 0; i < unreadCount; i++) {
+      window.dispatchEvent(new CustomEvent("hrNotificationRead"));
+    }
 
     const globalIds = ids.filter(id => String(id).startsWith('g-')).map(id => String(id).slice(2));
     const personalIds = ids.filter(id => String(id).startsWith('p-')).map(id => String(id).slice(2));
 
     if (globalIds.length) {
-      await supabase.from(TABLE).update({ unread: false }).in('id', globalIds);
+      const { error } = await supabase.from(TABLE).update({ unread: false }).in('id', globalIds);
+      if (error) console.warn("[HrNotifications] Error marking global notifications as read:", error);
     }
     if (personalIds.length) {
-      await supabase.from("employee_notifications").update({ unread: false }).in('id', personalIds);
+      const { error } = await supabase.from("employee_notifications").update({ unread: false }).in('id', personalIds);
+      if (error) console.warn("[HrNotifications] Error marking personal notifications as read:", error);
     }
 
-    setItems((prev) => prev.map((x) => (ids.includes(x.id) ? { ...x, unread: false } : x)));
     setSelected((prev) => {
       const next = new Set(prev);
       ids.forEach((id) => next.delete(id));
       return next;
     });
+  };
+
+  // ✅ View notification - opens modal and marks as read
+  const viewNotification = async (n) => {
+    setViewingNotif(n);
+    if (n.unread) {
+      await markRead([n.id]);
+    }
   };
 
   // ✅ dismiss notification (user-specific, stored in localStorage - doesn't delete from DB)
@@ -691,11 +709,82 @@ export default function HrNotifications() {
               n={n}
               selected={selected.has(n.id)}
               onToggleSelect={() => toggleSelect(n.id)}
-              onMarkRead={() => markRead([n.id])}
+              onView={() => viewNotification(n)}
               onDelete={() => remove([n.id])}
               onGoToSource={() => goToSource(n)}
             />
           ))}
+        </div>
+      )}
+
+      {/* ✅ VIEW NOTIFICATION MODAL */}
+      {viewingNotif && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setViewingNotif(null)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-xl w-full max-w-md mx-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              className="p-4 flex items-center justify-between"
+              style={{ backgroundColor: HEADER }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-white/20 grid place-items-center">
+                  {(() => {
+                    const Icon = typeIcon[viewingNotif.type] ?? Info;
+                    return <Icon size={18} className="text-white" />;
+                  })()}
+                </div>
+                <div>
+                  <p className="text-xs text-white/70">{viewingNotif.source}</p>
+                  <p className="text-sm font-bold text-white">{typeLabel(viewingNotif.type)}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewingNotif(null)}
+                className="h-8 w-8 rounded-full bg-white/20 hover:bg-white/30 grid place-items-center transition"
+              >
+                <X size={16} className="text-white" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">{viewingNotif.title}</h3>
+                <p className="text-sm text-slate-600 mt-2 leading-relaxed">{viewingNotif.detail}</p>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <Clock3 size={14} />
+                <span>{viewingNotif.timeLabel}</span>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t flex items-center justify-between gap-3">
+              <button
+                onClick={() => setViewingNotif(null)}
+                className="text-sm font-semibold text-slate-600 hover:text-slate-800 transition"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  goToSource(viewingNotif);
+                  setViewingNotif(null);
+                }}
+                className="px-4 py-2 text-sm font-semibold rounded-xl text-white transition"
+                style={{ backgroundColor: HEADER }}
+              >
+                Go to {viewingNotif.source}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

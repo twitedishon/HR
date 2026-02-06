@@ -15,6 +15,8 @@ import {
   MailOpen,
   RefreshCw,
   Users,
+  Eye,
+  X,
 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient"; // ✅ adjust path if different
 
@@ -189,7 +191,7 @@ function StatCard({ icon: Icon, label, value, active, onClick, colorTheme }) {
   );
 }
 
-function NotificationRow({ n, selected, onToggleSelect, onMarkRead, onDelete, onGoToSource }) {
+function NotificationRow({ n, selected, onToggleSelect, onView, onDelete, onGoToSource }) {
   const Icon = typeIcon[n.type] ?? Info;
   const t = tone[n.type] ?? tone.info;
 
@@ -264,16 +266,17 @@ function NotificationRow({ n, selected, onToggleSelect, onMarkRead, onDelete, on
                   Go to {n.source}
                 </button>
 
-                {n.unread ? (
-                  <button
-                    onClick={onMarkRead}
-                    className="text-[11px] font-semibold rounded-full border px-3 py-1 hover:bg-slate-50 inline-flex items-center gap-1"
-                    title="Mark as read"
-                  >
-                    <MailOpen size={12} />
-                    Mark read
-                  </button>
-                ) : null}
+                <button
+                  onClick={onView}
+                  className={`text-[11px] font-semibold rounded-full border px-3 py-1 inline-flex items-center gap-1 transition ${n.unread
+                    ? "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                    : "hover:bg-slate-50"
+                    }`}
+                  title="View details"
+                >
+                  <Eye size={12} />
+                  View
+                </button>
 
                 <button
                   onClick={onDelete}
@@ -303,6 +306,7 @@ export default function AdminNotifications() {
   const [source, setSource] = useState("All");
   const [status, setStatus] = useState("All");
   const [selected, setSelected] = useState(() => new Set());
+  const [viewingNotif, setViewingNotif] = useState(null); // ✅ Modal state
 
   // ✅ fetch notifications (with user-specific filtering by target_email)
   const fetchNotifications = async () => {
@@ -333,12 +337,37 @@ export default function AdminNotifications() {
 
     const { data, error } = await query;
 
+    // ✅ Also fetch personal approval/rejection notifications from employee_notifications
+    let personalNotifications = [];
+    if (currentUserId) {
+      const { data: personalData, error: personalError } = await supabase
+        .from("employee_notifications")
+        .select("id,title,message,type,category,route,unread,created_at")
+        .eq("user_id", currentUserId)
+        .order("created_at", { ascending: false });
+
+      if (!personalError && personalData) {
+        // Map personal notifications to match the expected format
+        personalNotifications = personalData.map(n => ({
+          id: `personal-${n.id}`,
+          title: n.title,
+          detail: n.message,
+          type: n.type === "success" ? "success" : n.type === "error" ? "warning" : n.type,
+          source: n.category || "LeaveManagement",
+          route: n.route,
+          unread: n.unread,
+          created_at: n.created_at,
+          isPersonal: true,
+        }));
+      }
+    }
+
     // Debug logging
-    console.log("[ApproverEmployeeNotifications] Query result:", { data, error, currentUserId });
+    console.log("[ApproverEmployeeNotifications] Query result:", { data, error, personalNotifications, currentUserId });
 
     if (error) {
       console.error("Notifications fetch error:", error);
-      setItems([]);
+      setItems(personalNotifications); // Still show personal notifications even if main query fails
     } else {
       // Note: target_email filtering removed - column not in database schema
       const dismissedIds = getDismissedIds();
@@ -360,16 +389,10 @@ export default function AdminNotifications() {
             return false;
           }
 
-          // Skip other employee leave approval/rejection notifications
-          if (detail.includes("your") && (detail.includes("request was approved") || detail.includes("request was rejected") || detail.includes("request was updated"))) {
-            return false;
-          }
-
           return true;
         })
         .map(n => ({
           ...n,
-          // Strip [ADMIN-SELF] marker from detail for display
           // Strip [ADMIN-SELF] marker and format dates
           detail: String(n.detail || "")
             .replace(/\[ADMIN-SELF\]\s*/gi, "")
@@ -378,7 +401,19 @@ export default function AdminNotifications() {
           unread: readIds.includes(n.id) ? false : n.unread,
         }));
 
-      setItems(filteredData);
+      // ✅ Filter personal notifications for dismissed/read status
+      const filteredPersonal = personalNotifications
+        .filter(n => !dismissedIds.includes(n.id))
+        .map(n => ({
+          ...n,
+          unread: readIds.includes(n.id) ? false : n.unread,
+        }));
+
+      // ✅ Merge both sources and sort by date
+      const combined = [...filteredData, ...filteredPersonal]
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      setItems(combined);
     }
 
     setSelected(new Set());
@@ -440,19 +475,38 @@ export default function AdminNotifications() {
 
   const clearSelection = () => setSelected(new Set());
 
-  // ✅ mark read (user-specific, stored in localStorage)
+  // ✅ mark read (user-specific, stored in localStorage) with optimistic update and custom event dispatch
   const markRead = async (ids) => {
     if (!ids?.length) return;
+
+    // ✅ Count how many are actually being marked as read
+    const unreadCount = ids.filter(id => items.find(x => x.id === id)?.unread).length;
+    if (unreadCount === 0) return;
+
+    // ✅ Optimistic update - immediately update local state  
+    setItems((prev) => prev.map((x) => (ids.includes(x.id) ? { ...x, unread: false } : x)));
+
+    // ✅ Dispatch custom event for immediate count sync in navbar
+    for (let i = 0; i < unreadCount; i++) {
+      window.dispatchEvent(new CustomEvent("approverNotificationRead"));
+    }
 
     // Store read state in localStorage for this user
     addReadIds(ids);
 
-    setItems((prev) => prev.map((x) => (ids.includes(x.id) ? { ...x, unread: false } : x)));
     setSelected((prev) => {
       const next = new Set(prev);
       ids.forEach((id) => next.delete(id));
       return next;
     });
+  };
+
+  // ✅ View notification - opens modal and marks as read
+  const viewNotification = (n) => {
+    setViewingNotif(n);
+    if (n.unread) {
+      markRead([n.id]);
+    }
   };
 
   // ✅ dismiss notification (user-specific, stored in localStorage - doesn't delete from DB)

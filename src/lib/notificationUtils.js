@@ -134,7 +134,7 @@ export const notifyEmployee = async ({
 };
 
 /**
- * Notify a manager about a new leave request from HR
+ * Notify a manager about a new leave request (from HR or Admin applying for their own leave)
  */
 export const notifyManagerNewRequest = async ({
   managerId,
@@ -144,6 +144,7 @@ export const notifyManagerNewRequest = async ({
   leaveType,
   fromDate,
   toDate,
+  ownerRole = "hr", // ✅ Added to distinguish HR/Admin leave requests
 }) => {
   if (!managerId) return;
 
@@ -175,10 +176,13 @@ export const notifyManagerNewRequest = async ({
 
     const dateRange =
       fromDate === toDate ? fromDate : `${fromDate} to ${toDate}`;
-    const message = `HR sent a ${leaveType} request for ${employeeName} (${dateRange}) for your approval.`;
+
+    // ✅ Fixed message format: Show that HR/Admin is applying for their OWN leave
+    const roleLabel = ownerRole === "admin" ? "Admin" : "HR";
+    const message = `${employeeName} (${roleLabel}) applied for ${leaveType} (${dateRange}) for your approval.`;
 
     const notificationData = {
-      title: "New Leave Request for Approval",
+      title: `${roleLabel} Leave Request for Approval`,
       detail: message,
       type: "info",
       source: "LeaveManagement",

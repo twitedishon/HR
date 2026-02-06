@@ -839,6 +839,7 @@ const LeaveManagement = () => {
                   leaveType: leaveType,
                   fromDate: from,
                   toDate: leaveMode === "Full Day" ? to : from,
+                  ownerRole: "admin", // ✅ Added to identify Admin's own leave request
                 });
               } catch (notifErr) {
                 console.warn("Manager notification failed:", notifErr?.message || notifErr);

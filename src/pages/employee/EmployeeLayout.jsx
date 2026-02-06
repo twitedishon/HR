@@ -105,6 +105,19 @@ export default function EmployeeLayout() {
     return () => supabase.removeChannel(channel);
   }, []);
 
+  // ✅ Listen for custom event when notification is viewed (immediate sync)
+  useEffect(() => {
+    const handleNotificationRead = () => {
+      console.log("[EmployeeLayout] employeeNotificationRead event received - decrementing count");
+      setNotifCount((prev) => Math.max(0, prev - 1));
+    };
+
+    window.addEventListener("employeeNotificationRead", handleNotificationRead);
+    return () => {
+      window.removeEventListener("employeeNotificationRead", handleNotificationRead);
+    };
+  }, []);
+
   const handleLogout = () => {
     try {
       sessionStorage.removeItem(DOCS_AUTH_KEY);

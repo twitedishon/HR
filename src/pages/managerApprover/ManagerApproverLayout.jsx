@@ -62,25 +62,53 @@ export default function ManagerLayout() {
 
   useEffect(() => {
     const fetchCount = async () => {
-      const { count } = await supabase
+      const { count, error } = await supabase
         .from("hrmss_notifications")
         .select("*", { count: "exact", head: true })
         .in("source", ALLOWED_SOURCES)
         .in("audience", AUDIENCE)
         .eq("unread", true);
-      setNotifCount(count || 0);
+
+      if (error) {
+        console.warn("[ManagerLayout] Error fetching notification count:", error);
+      } else {
+        console.log("[ManagerLayout] Notification count updated:", count);
+        setNotifCount(count || 0);
+      }
     };
 
     fetchCount();
 
+    // ✅ Listen to all events (INSERT, UPDATE, DELETE) for better real-time updates
     const channel = supabase
       .channel("manager_layout_notif_count")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "hrmss_notifications" },
-        () => fetchCount()
+        { event: "INSERT", schema: "public", table: "hrmss_notifications" },
+        (payload) => {
+          console.log("[ManagerLayout] New notification inserted:", payload);
+          fetchCount();
+        }
       )
-      .subscribe();
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "hrmss_notifications" },
+        (payload) => {
+          console.log("[ManagerLayout] Notification updated:", payload);
+          fetchCount();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "hrmss_notifications" },
+        (payload) => {
+          console.log("[ManagerLayout] Notification deleted:", payload);
+          fetchCount();
+        }
+      )
+      .subscribe((status) => {
+        console.log("[ManagerLayout] Subscription status:", status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -91,6 +119,19 @@ export default function ManagerLayout() {
     // Just hydrate from stored manager session; avoid redirects that break navigation.
     setSession(getManagerSession());
   }, [location.pathname]);
+
+  // ✅ Listen for custom event when notification is marked as read (immediate sync)
+  useEffect(() => {
+    const handleNotificationRead = () => {
+      console.log("[ManagerLayout] notificationRead event received - decrementing count");
+      setNotifCount((prev) => Math.max(0, prev - 1));
+    };
+
+    window.addEventListener("notificationRead", handleNotificationRead);
+    return () => {
+      window.removeEventListener("notificationRead", handleNotificationRead);
+    };
+  }, []);
 
   const approver = access === "approver";
   const handleLogout = () => {
