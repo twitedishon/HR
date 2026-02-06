@@ -23,6 +23,7 @@ import {
   Briefcase,
   CreditCard,
   HeartPulse,
+  ChevronDown,
 } from "lucide-react";
 
 import { supabase } from "../../lib/supabaseClient";
@@ -293,6 +294,7 @@ export default function EmployeeSignIn() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false); // ✅ Validation state
 
   const jobInfoMerged = useRef(false);
   const [avatarFile, setAvatarFile] = useState(null);
@@ -537,15 +539,61 @@ export default function EmployeeSignIn() {
     try {
       setSaving(true);
       setError("");
+      setIsSubmitted(true); // ✅ Trigger validation visuals
 
       const requiredFields = [
         { key: "fullName", label: "Full Name" },
         { key: "personalEmail", label: "Personal Email" },
         { key: "mobileNumber", label: "Mobile Number" },
+
+        // Personal
+        { key: "dob", label: "Date of Birth" },
+        { key: "gender", label: "Gender" },
+        { key: "maritalStatus", label: "Marital Status" },
+        { key: "bloodGroup", label: "Blood Group" },
+
+        // Job Experience
+        { key: "totalExpFrom", label: "Total Experience From" },
+
+        // Address
+        { key: "currentAddress", label: "Current Address" },
+        { key: "permanentAddress", label: "Permanent Address" },
+
+        // Bank
+        { key: "accountHolderName", label: "Account Holder Name" },
+        { key: "bankName", label: "Bank Name" },
+        { key: "accountNumber", label: "Account Number" },
+        { key: "ifscCode", label: "IFSC Code" },
+        { key: "branch", label: "Branch" },
+
+        // Emergency
+        { key: "emergencyName", label: "Emergency Contact Name" },
+        { key: "emergencyRelationship", label: "Relationship" },
+        { key: "emergencyContactNumber", label: "Emergency Contact Number" },
       ];
 
       if (role === "employee" || empIdFromLogin) {
         requiredFields.push({ key: "employeeId", label: "Employee ID" });
+      }
+
+      // ✅ Phone Validation (10 digits)
+      const validatePhone = (key, label, isRequired) => {
+        const val = form[key] || "";
+        const numPart = val.includes(" ") ? val.split(" ")[1] : val;
+        // Check if just code or empty
+        if (isRequired && (!numPart || numPart.replace(/\D/g, "").length !== 10)) return `Please enter valid 10-digit ${label}`;
+        if (!isRequired && numPart && numPart.replace(/\D/g, "").length !== 10) return `Please enter valid 10-digit ${label}`;
+        return null;
+      };
+
+      const phoneError = validatePhone("mobileNumber", "Mobile Number", true) ||
+        validatePhone("emergencyContactNumber", "Emergency Contact Number", true) ||
+        (form.alternateContactNumber && validatePhone("alternateContactNumber", "Alternate Contact Number", false));
+
+      if (phoneError) {
+        setError(phoneError);
+        setSaving(false);
+        return;
       }
 
       const missing = requiredFields.filter((f) => !String(form[f.key] || "").trim());
@@ -960,16 +1008,67 @@ export default function EmployeeSignIn() {
                   </div>
 
                   <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input icon={User} label="EMPLOYEE FULL NAME" value={form.fullName} onChange={(v) => onChange("fullName", v)} placeholder="Enter full name" />
-                    <Input icon={IdCard} label="EMPLOYEE ID (IF APPLICABLE)" value={form.employeeId} onChange={(v) => onChange("employeeId", v)} placeholder="EMP-001" />
+                    <Input
+                      icon={User}
+                      label="EMPLOYEE FULL NAME"
+                      value={form.fullName}
+                      onChange={(v) => onChange("fullName", v)}
+                      placeholder="Enter full name"
+                      required
+                      error={isSubmitted && !form.fullName}
+                    />
+                    <Input
+                      icon={IdCard}
+                      label="EMPLOYEE ID (IF APPLICABLE)"
+                      value={form.employeeId}
+                      onChange={(v) => onChange("employeeId", v)}
+                      placeholder="EMP-001"
+                      required={role === "employee" || !!empIdFromLogin}
+                      error={isSubmitted && (role === "employee" || !!empIdFromLogin) && !form.employeeId}
+                    />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input icon={CalendarDays} label="DATE OF BIRTH" type="date" value={form.dob} onChange={(v) => onChange("dob", v)} />
-                  <Select icon={User} label="GENDER" value={form.gender} onChange={(v) => onChange("gender", v)} options={["Male", "Female", "Other"]} placeholder="Select Gender" />
-                  <Select icon={HeartPulse} label="MARITAL STATUS" value={form.maritalStatus} onChange={(v) => onChange("maritalStatus", v)} options={["Single", "Married", "Other"]} placeholder="Select Status" />
-                  <Select icon={HeartPulse} label="BLOOD GROUP" value={form.bloodGroup} onChange={(v) => onChange("bloodGroup", v)} options={["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]} placeholder="Select Blood Group" />
+                  <Input
+                    icon={CalendarDays}
+                    label="DATE OF BIRTH"
+                    type="date"
+                    value={form.dob}
+                    onChange={(v) => onChange("dob", v)}
+                    required
+                    error={isSubmitted && !form.dob}
+                  />
+                  <Select
+                    icon={User}
+                    label="GENDER"
+                    value={form.gender}
+                    onChange={(v) => onChange("gender", v)}
+                    options={["Male", "Female", "Other"]}
+                    placeholder="Select Gender"
+                    required
+                    error={isSubmitted && !form.gender}
+                  />
+                  <Select
+                    icon={HeartPulse}
+                    label="MARITAL STATUS"
+                    value={form.maritalStatus}
+                    onChange={(v) => onChange("maritalStatus", v)}
+                    options={["Single", "Married", "Other"]}
+                    placeholder="Select Status"
+                    required
+                    error={isSubmitted && !form.maritalStatus}
+                  />
+                  <Select
+                    icon={HeartPulse}
+                    label="BLOOD GROUP"
+                    value={form.bloodGroup}
+                    onChange={(v) => onChange("bloodGroup", v)}
+                    options={["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]}
+                    placeholder="Select Blood Group"
+                    required
+                    error={isSubmitted && !form.bloodGroup}
+                  />
                 </div>
 
                 <Divider />
@@ -993,7 +1092,14 @@ export default function EmployeeSignIn() {
                   <div className="space-y-3">
                     <p className="text-[11px] uppercase tracking-wide text-slate-500 font-bold">Total Work Experience</p>
                     <div className="grid grid-cols-2 gap-3">
-                      <Input type="date" label="FROM" value={form.totalExpFrom} onChange={(v) => onChange("totalExpFrom", v)} />
+                      <Input
+                        type="date"
+                        label="FROM"
+                        value={form.totalExpFrom}
+                        onChange={(v) => onChange("totalExpFrom", v)}
+                        required
+                        error={isSubmitted && !form.totalExpFrom}
+                      />
                       <Input type="date" label="TO" value={form.totalExpTo} onChange={(v) => onChange("totalExpTo", v)} />
                     </div>
                     {form.totalExpFrom && (
@@ -1023,18 +1129,52 @@ export default function EmployeeSignIn() {
                 <SectionHeader icon={Phone} title="Contact Details" subtitle="Email & phone numbers" />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input icon={Mail} label="PERSONAL EMAIL ID" value={form.personalEmail} onChange={(v) => onChange("personalEmail", v)} placeholder="name@gmail.com" />
+                  <Input
+                    icon={Mail}
+                    label="PERSONAL EMAIL ID"
+                    value={form.personalEmail}
+                    onChange={(v) => onChange("personalEmail", v)}
+                    placeholder="name@gmail.com"
+                    required
+                    error={isSubmitted && !form.personalEmail}
+                  />
                   <Input icon={Mail} label="OFFICIAL EMAIL ID" value={form.officialEmail} onChange={(v) => onChange("officialEmail", v)} placeholder="name@company.com" />
-                  <Input icon={Phone} label="MOBILE NUMBER" value={form.mobileNumber} onChange={(v) => onChange("mobileNumber", v)} placeholder="+94 / +91 ..." />
-                  <Input icon={Phone} label="ALTERNATE CONTACT NUMBER" value={form.alternateContactNumber} onChange={(v) => onChange("alternateContactNumber", v)} placeholder="+94 / +91 ..." />
+                  <PhoneInput
+                    label="MOBILE NUMBER"
+                    value={form.mobileNumber}
+                    onChange={(v) => onChange("mobileNumber", v)}
+                    required
+                    error={isSubmitted && !form.mobileNumber}
+                  />
+                  <PhoneInput
+                    label="ALTERNATE CONTACT NUMBER"
+                    value={form.alternateContactNumber}
+                    onChange={(v) => onChange("alternateContactNumber", v)}
+                  />
                 </div>
 
                 <Divider />
                 <SectionHeader icon={Home} title="Address Information" subtitle="Current & permanent address" />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Textarea icon={Home} label="CURRENT ADDRESS" value={form.currentAddress} onChange={(v) => onChange("currentAddress", v)} placeholder="Enter current address" />
-                  <Textarea icon={Home} label="PERMANENT ADDRESS" value={form.permanentAddress} onChange={(v) => onChange("permanentAddress", v)} placeholder="Enter permanent address" />
+                  <Textarea
+                    icon={Home}
+                    label="CURRENT ADDRESS"
+                    value={form.currentAddress}
+                    onChange={(v) => onChange("currentAddress", v)}
+                    placeholder="Enter current address"
+                    required
+                    error={isSubmitted && !form.currentAddress}
+                  />
+                  <Textarea
+                    icon={Home}
+                    label="PERMANENT ADDRESS"
+                    value={form.permanentAddress}
+                    onChange={(v) => onChange("permanentAddress", v)}
+                    placeholder="Enter permanent address"
+                    required
+                    error={isSubmitted && !form.permanentAddress}
+                  />
                 </div>
 
                 <Divider />
@@ -1148,11 +1288,51 @@ export default function EmployeeSignIn() {
                 <SectionHeader icon={CreditCard} title="Bank & Payroll Details" subtitle="Salary credit details" />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input icon={User} label="ACCOUNT HOLDER NAME" value={form.accountHolderName} onChange={(v) => onChange("accountHolderName", v)} placeholder="Name as per bank" />
-                  <Input icon={Building2} label="BANK NAME" value={form.bankName} onChange={(v) => onChange("bankName", v)} placeholder="Bank name" />
-                  <Input icon={CreditCard} label="ACCOUNT NUMBER" value={form.accountNumber} onChange={(v) => onChange("accountNumber", v)} placeholder="XXXXXXXXXXXX" />
-                  <Input icon={IdCard} label="IFSC CODE" value={form.ifscCode} onChange={(v) => onChange("ifscCode", v)} placeholder="IFSC0001234" />
-                  <Input icon={MapPin} label="BRANCH" value={form.branch} onChange={(v) => onChange("branch", v)} placeholder="Branch name" />
+                  <Input
+                    icon={User}
+                    label="ACCOUNT HOLDER NAME"
+                    value={form.accountHolderName}
+                    onChange={(v) => onChange("accountHolderName", v)}
+                    placeholder="Name as per bank"
+                    required
+                    error={isSubmitted && !form.accountHolderName}
+                  />
+                  <Input
+                    icon={Building2}
+                    label="BANK NAME"
+                    value={form.bankName}
+                    onChange={(v) => onChange("bankName", v)}
+                    placeholder="Bank name"
+                    required
+                    error={isSubmitted && !form.bankName}
+                  />
+                  <Input
+                    icon={CreditCard}
+                    label="ACCOUNT NUMBER"
+                    value={form.accountNumber}
+                    onChange={(v) => onChange("accountNumber", v)}
+                    placeholder="XXXXXXXXXXXX"
+                    required
+                    error={isSubmitted && !form.accountNumber}
+                  />
+                  <Input
+                    icon={IdCard}
+                    label="IFSC CODE"
+                    value={form.ifscCode}
+                    onChange={(v) => onChange("ifscCode", v)}
+                    placeholder="IFSC0001234"
+                    required
+                    error={isSubmitted && !form.ifscCode}
+                  />
+                  <Input
+                    icon={MapPin}
+                    label="BRANCH"
+                    value={form.branch}
+                    onChange={(v) => onChange("branch", v)}
+                    placeholder="Branch name"
+                    required
+                    error={isSubmitted && !form.branch}
+                  />
                   <Input icon={MapPin} label="WORK LOCATION (OPTIONAL)" value={form.location} onChange={(v) => onChange("location", v)} placeholder="Colombo / Chennai" />
                 </div>
 
@@ -1160,9 +1340,31 @@ export default function EmployeeSignIn() {
                 <SectionHeader icon={HeartPulse} title="Emergency Contact Details" subtitle="Who to contact in emergency" />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input icon={User} label="NAME" value={form.emergencyName} onChange={(v) => onChange("emergencyName", v)} placeholder="Contact person name" />
-                  <Input icon={HeartPulse} label="RELATIONSHIP" value={form.emergencyRelationship} onChange={(v) => onChange("emergencyRelationship", v)} placeholder="Father / Mother / Spouse..." />
-                  <Input icon={Phone} label="CONTACT NUMBER" value={form.emergencyContactNumber} onChange={(v) => onChange("emergencyContactNumber", v)} placeholder="+94 / +91 ..." />
+                  <Input
+                    icon={User}
+                    label="NAME"
+                    value={form.emergencyName}
+                    onChange={(v) => onChange("emergencyName", v)}
+                    placeholder="Contact person name"
+                    required
+                    error={isSubmitted && !form.emergencyName}
+                  />
+                  <Input
+                    icon={HeartPulse}
+                    label="RELATIONSHIP"
+                    value={form.emergencyRelationship}
+                    onChange={(v) => onChange("emergencyRelationship", v)}
+                    placeholder="Father / Mother / Spouse..."
+                    required
+                    error={isSubmitted && !form.emergencyRelationship}
+                  />
+                  <PhoneInput
+                    label="CONTACT NUMBER"
+                    value={form.emergencyContactNumber}
+                    onChange={(v) => onChange("emergencyContactNumber", v)}
+                    required
+                    error={isSubmitted && !form.emergencyContactNumber}
+                  />
                 </div>
 
                 <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -1281,13 +1483,93 @@ function Divider() {
   return <div className="h-px w-full bg-slate-200" />;
 }
 
-function Input({ icon: Icon, label, value, onChange, placeholder, type = "text", disabled = false }) {
+function PhoneInput({ label, value, onChange, required = false, error = false }) {
+  // Parse value: expects "+91 9876543210" or just "9876543210"
+  let code = "+91";
+  let number = "";
+
+  if (value) {
+    if (value.includes(" ")) {
+      const parts = value.split(" ");
+      code = parts[0];
+      number = parts.slice(1).join("");
+    } else if (value.startsWith("+")) {
+      // heuristic: +9198765...
+      code = value.substring(0, 3);
+      number = value.substring(3);
+    } else {
+      number = value;
+    }
+  }
+
+  // Supported codes
+  const codes = ["+91", "+94"];
+  if (!codes.includes(code)) code = "+91"; // Default fallback
+
+  const handleCode = (e) => {
+    const newCode = e.target.value;
+    onChange(`${newCode} ${number}`);
+  }
+
+  const handleNumber = (e) => {
+    // Only digits, max 10
+    const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+    onChange(`${code} ${val}`);
+  }
+
   return (
     <div className="space-y-1.5">
-      <p className="text-[11px] uppercase tracking-wide text-slate-500">{label}</p>
-      <div className={`group flex items-center gap-2 rounded-2xl border bg-white px-3 py-2.5 shadow-sm transition ${disabled ? 'opacity-50 bg-slate-50' : 'focus-within:ring-2 focus-within:ring-purple-200 focus-within:border-purple-300'}`}>
+      <p className="text-[11px] uppercase tracking-wide text-slate-500">
+        {label} {required && <span className="text-rose-500">*</span>}
+      </p>
+      <div className={`group flex items-center gap-2 rounded-2xl border bg-white px-3 py-2.5 shadow-sm transition ${error
+        ? 'border-rose-300 ring-1 ring-rose-200 focus-within:ring-2 focus-within:ring-rose-200 focus-within:border-rose-400'
+        : 'focus-within:ring-2 focus-within:ring-purple-200 focus-within:border-purple-300'
+        }`}>
+
+        {/* Country Code Select */}
+        <div className="relative flex items-center min-w-[60px] border-r border-slate-200 pr-2 mr-2">
+          <select
+            value={code}
+            onChange={handleCode}
+            className="w-full appearance-none bg-transparent text-sm font-semibold text-slate-700 outline-none z-10 cursor-pointer"
+          >
+            {codes.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <ChevronDown size={12} className="absolute right-0 text-slate-400 pointer-events-none" />
+        </div>
+
+        {/* Fixed Icon for Phone */}
+        <Phone size={16} className={`shrink-0 transition ${error ? 'text-rose-400' : 'text-slate-400 group-focus-within:text-purple-700'}`} />
+
+        <input
+          type="text"
+          className="w-full outline-none text-sm text-slate-900 placeholder:text-slate-400 bg-transparent font-medium tracking-wide"
+          value={number}
+          onChange={handleNumber}
+          placeholder="1234567890"
+        />
+      </div>
+    </div>
+  );
+}
+
+function Input({ icon: Icon, label, value, onChange, placeholder, type = "text", disabled = false, required = false, error = false }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[11px] uppercase tracking-wide text-slate-500">
+        {label} {required && <span className="text-rose-500">*</span>}
+      </p>
+      <div className={`group flex items-center gap-2 rounded-2xl border bg-white px-3 py-2.5 shadow-sm transition ${disabled ? 'opacity-50 bg-slate-50'
+        : error
+          ? 'border-rose-300 ring-1 ring-rose-200 focus-within:ring-2 focus-within:ring-rose-200 focus-within:border-rose-400'
+          : 'focus-within:ring-2 focus-within:ring-purple-200 focus-within:border-purple-300'
+        }`}>
         {Icon ? (
-          <Icon size={16} className={`text-slate-400 group-focus-within:text-purple-700 transition ${disabled ? '' : 'group-focus-within:text-purple-700'}`} />
+          <Icon size={16} className={`transition ${disabled ? 'text-slate-400'
+            : error ? 'text-rose-400'
+              : 'text-slate-400 group-focus-within:text-purple-700'
+            }`} />
         ) : null}
 
         <input
@@ -1303,12 +1585,17 @@ function Input({ icon: Icon, label, value, onChange, placeholder, type = "text",
   );
 }
 
-function Select({ icon: Icon, label, value, onChange, options, placeholder }) {
+function Select({ icon: Icon, label, value, onChange, options, placeholder, required = false, error = false }) {
   return (
     <div className="space-y-1.5">
-      <p className="text-[11px] uppercase tracking-wide text-slate-500">{label}</p>
-      <div className="group flex items-center gap-2 rounded-2xl border bg-white px-3 py-2.5 shadow-sm focus-within:ring-2 focus-within:ring-purple-200 focus-within:border-purple-300 transition">
-        {Icon ? <Icon size={16} className="text-slate-400 group-focus-within:text-purple-700 transition" /> : null}
+      <p className="text-[11px] uppercase tracking-wide text-slate-500">
+        {label} {required && <span className="text-rose-500">*</span>}
+      </p>
+      <div className={`group flex items-center gap-2 rounded-2xl border bg-white px-3 py-2.5 shadow-sm transition ${error
+        ? 'border-rose-300 ring-1 ring-rose-200 focus-within:ring-2 focus-within:ring-rose-200 focus-within:border-rose-400'
+        : 'focus-within:ring-2 focus-within:ring-purple-200 focus-within:border-purple-300'
+        }`}>
+        {Icon ? <Icon size={16} className={`transition ${error ? 'text-rose-400' : 'text-slate-400 group-focus-within:text-purple-700'}`} /> : null}
         <select
           className="w-full bg-transparent outline-none text-sm text-slate-900"
           value={value || ""}
@@ -1326,12 +1613,17 @@ function Select({ icon: Icon, label, value, onChange, options, placeholder }) {
   );
 }
 
-function Textarea({ icon: Icon, label, value, onChange, placeholder }) {
+function Textarea({ icon: Icon, label, value, onChange, placeholder, required = false, error = false }) {
   return (
     <div className="space-y-1.5">
-      <p className="text-[11px] uppercase tracking-wide text-slate-500">{label}</p>
-      <div className="group flex items-start gap-2 rounded-2xl border bg-white px-3 py-2.5 shadow-sm focus-within:ring-2 focus-within:ring-purple-200 focus-within:border-purple-300 transition">
-        {Icon ? <Icon size={16} className="mt-0.5 text-slate-400 group-focus-within:text-purple-700 transition" /> : null}
+      <p className="text-[11px] uppercase tracking-wide text-slate-500">
+        {label} {required && <span className="text-rose-500">*</span>}
+      </p>
+      <div className={`group flex items-start gap-2 rounded-2xl border bg-white px-3 py-2.5 shadow-sm transition ${error
+        ? 'border-rose-300 ring-1 ring-rose-200 focus-within:ring-2 focus-within:ring-rose-200 focus-within:border-rose-400'
+        : 'focus-within:ring-2 focus-within:ring-purple-200 focus-within:border-purple-300'
+        }`}>
+        {Icon ? <Icon size={16} className={`mt-0.5 transition ${error ? 'text-rose-400' : 'text-slate-400 group-focus-within:text-purple-700'}`} /> : null}
         <textarea
           className="w-full outline-none text-sm text-slate-900 placeholder:text-slate-400 min-h-[110px] resize-none"
           value={value || ""}
