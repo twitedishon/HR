@@ -4,7 +4,6 @@ export default function EmployeeDocuments() {
   return (
     <DocumentManager
       title="My Documents"
-      subtitle="Upload and manage your documents"
       accent="slate"
       role="employee"
 

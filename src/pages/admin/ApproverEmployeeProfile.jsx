@@ -606,13 +606,9 @@ export default function AdminProfile() {
       {/* HEADER */}
       <div className="flex justify-between items-start">
         <div>
-          <p className="text-xs uppercase tracking-wide text-slate-500">
-            Admin Console
-          </p>
+
           <h1 className="text-2xl font-bold text-slate-900">My Profile</h1>
-          <p className="text-sm text-slate-500">
-            Manage your admin profile information
-          </p>
+
         </div>
 
         <button

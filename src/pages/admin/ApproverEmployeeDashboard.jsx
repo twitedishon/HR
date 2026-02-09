@@ -609,8 +609,6 @@ const ApproverEmployeeDashboard = () => {
         {/* Leave Details */}
         <SectionCard
           title="Leave Details"
-          subtitle="Absence types + remaining balance"
-          action={<Badge tone="info">Leave</Badge>}
         >
           {/* Absence type cards */}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -726,7 +724,6 @@ const ApproverEmployeeDashboard = () => {
         {/* Job Information */}
         <SectionCard
           title="Job Information"
-          subtitle="Your core employment details"
           action={<Badge tone="neutral">Profile</Badge>}
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

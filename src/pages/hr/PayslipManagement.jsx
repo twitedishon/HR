@@ -167,14 +167,7 @@ function PayslipPreviewModal({ open, onClose, slip }) {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white hover:bg-white/15"
-              onClick={() => window.print?.()}
-            >
-              <Printer size={16} />
-              Print
-            </button>
+
             <button
               type="button"
               className="h-10 w-10 rounded-xl bg-white text-slate-900 grid place-items-center hover:bg-slate-100"
@@ -728,9 +721,7 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-xs font-semibold text-slate-500">Payroll / Payslips</p>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Payslip Management</h1>
-          <p className="text-sm text-slate-600">View payslips and send to employee portal/email.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <a
@@ -962,13 +953,7 @@ export default function PayslipManagement({ basePath = "/dashboard" }) {
                 >
                   Open Preview <FileText size={16} />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => window.print?.()}
-                  className="inline-flex items-center justify-between rounded-2xl border bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
-                >
-                  Print <Printer size={16} />
-                </button>
+
                 <button
                   type="button"
                   onClick={() => send(selected.id, `quick:${selected.id}`)}

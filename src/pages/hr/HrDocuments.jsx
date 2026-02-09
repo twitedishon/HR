@@ -48,7 +48,6 @@ export default function HrDocuments() {
       {active === "uploads" ? (
         <DocumentManager
           title="HR Uploads"
-          subtitle="Upload and manage your HR documents"
           accent="purple"
           role="hr"
           mode="user"

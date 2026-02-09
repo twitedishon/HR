@@ -143,9 +143,7 @@ export default function EmployeeNotifications() {
           </div>
           <div className="flex-1">
             <h1 className="text-2xl font-bold text-slate-900">Notifications</h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Stay updated with your latest alerts and announcements.
-            </p>
+
           </div>
           <button
             type="button"

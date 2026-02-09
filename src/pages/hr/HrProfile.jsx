@@ -98,12 +98,12 @@ function mapDbToProfile(data, fallback = {}) {
 
     emergencyContacts: data.emergency_name
       ? [
-          {
-            name: data.emergency_name || "",
-            relation: data.emergency_relationship || "",
-            phone: data.emergency_contact_number || "",
-          },
-        ]
+        {
+          name: data.emergency_name || "",
+          relation: data.emergency_relationship || "",
+          phone: data.emergency_contact_number || "",
+        },
+      ]
       : [],
 
     idProofs: [],
@@ -406,13 +406,9 @@ export default function HrProfile() {
       {/* HEADER */}
       <div className="flex justify-between items-start">
         <div>
-          <p className="text-xs uppercase tracking-wide text-slate-500">
-            HR Workspace
-          </p>
+
           <h1 className="text-2xl font-bold text-slate-900">My Profile</h1>
-          <p className="text-sm text-slate-500">
-            Manage your HR profile information
-          </p>
+
         </div>
 
         <button

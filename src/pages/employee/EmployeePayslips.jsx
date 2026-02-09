@@ -611,13 +611,7 @@ export default function EmployeePayslips() {
               <div className="flex flex-wrap gap-2">
                 {/* Download PDF button removed as per request */}
 
-                <PrimaryButton
-                  onClick={handlePrint}
-                  className="bg-white text-black border border-slate-200 hover:bg-slate-50"
-                >
-                  <Printer size={16} />
-                  Print
-                </PrimaryButton>
+
               </div>
             </div>
           </div>

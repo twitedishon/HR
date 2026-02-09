@@ -629,10 +629,7 @@ export default function WorkAnniversary() {
                 <div>
 
                   <h1 className="wa-title">Work Anniversary</h1>
-                  <p className="wa-sub">
-                    Track service milestones, upcoming celebrations, and team tenure at a
-                    glance.
-                  </p>
+
                 </div>
               </header>
 

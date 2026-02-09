@@ -607,14 +607,7 @@ export default function AdminPayslipView() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <PrimaryButton
-                  onClick={handlePrint}
-                >
-                  <Printer size={16} />
-                  Print
-                </PrimaryButton>
-              </div>
+
             </div>
           </div>
         </div>

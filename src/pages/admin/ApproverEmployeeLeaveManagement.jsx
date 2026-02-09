@@ -969,13 +969,7 @@ const LeaveManagement = () => {
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Leave Management</h1>
-          <p className="text-sm text-gray-600">
-            {mode === "employee"
-              ? currentAdmin?.id
-                ? "Admin can view all employee leave letters."
-                : "Employee can view only their own leave letters."
-              : "Admin can apply leave and act on requests assigned to them."}
-          </p>
+
         </div>
 
         <div className="flex items-center gap-3">
